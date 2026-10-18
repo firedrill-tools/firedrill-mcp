@@ -1,0 +1,85 @@
+name: Publish MCP Registry metadata
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Check reviewed package and existing Registry record
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync,appendFileSync} from 'node:fs';
+          const server=JSON.parse(readFileSync('server.json','utf8'));
+          assert.equal(server.name,'io.github.firedrill-tools/firedrill');
+          assert.equal(server.repository.url,'https://github.com/firedrill-tools/firedrill-mcp');
+          assert.equal(server.version,'2.0.0');
+          assert.equal(server.packages.length,1);
+          assert.equal(server.packages[0].identifier,'@firedrill-run/mcp');
+          assert.equal(server.packages[0].version,server.version);
+          const read=async url=>{const response=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(20000)});assert.equal(response.status,200);return response.json();};
+          const npm=await read('https://registry.npmjs.org/@firedrill-run%2fmcp/2.0.0');
+          assert.equal(npm.mcpName,server.name);
+          assert.equal(npm.dist.integrity,'sha512-xXLPUuYii+f20h7k3k3y/TmQ+RsRwJ2qzROrmGUNwsP1kSaku3K0UzGMPYAq9pR26avUPXWgkkQQ7PLR3V5BDw==');
+          const registry=await read('https://registry.modelcontextprotocol.io/v0.1/servers?search='+encodeURIComponent(server.name));
+          const existing=registry.servers.find(item=>item.server.name===server.name&&item.server.version===server.version);
+          if(existing) assert.deepEqual(existing.server,server,'Existing immutable Registry version differs; do not publish again');
+          appendFileSync(process.env.GITHUB_OUTPUT,'publish='+String(!existing)+'\n');
+          console.log(existing?'Exact Registry version already exists.':'Reviewed npm package confirmed; Registry version is absent.');
+          NODE
+      - name: Download and verify official publisher
+        if: steps.preflight.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/mcp-publisher.tar.gz"
+          node -e 'const fs=require("node:fs"),crypto=require("node:crypto");const b=fs.readFileSync(process.argv[1]);if(b.length!==7339841||crypto.createHash("sha256").update(b).digest("hex")!=="a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc")throw Error("Publisher integrity mismatch")' "$RUNNER_TEMP/mcp-publisher.tar.gz"
+          tar -xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP" mcp-publisher
+      - name: Publish using GitHub Actions identity
+        if: steps.preflight.outputs.publish == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/mcp-publisher" login github-oidc
+          "$RUNNER_TEMP/mcp-publisher" publish server.json
+      - name: Verify public Registry version
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {readFileSync} from 'node:fs';
+          const expected=JSON.parse(readFileSync('server.json','utf8'));
+          const response=await fetch('https://registry.modelcontextprotocol.io/v0.1/servers?search='+encodeURIComponent(expected.name),{redirect:'error',signal:AbortSignal.timeout(20000)});
+          assert.equal(response.status,200);
+          const found=(await response.json()).servers.find(item=>item.server.name===expected.name&&item.server.version===expected.version);
+          assert(found,'Published version is not publicly visible; inspect before another publish');
+          assert.deepEqual(found.server,expected);
+          console.log('Verified official Registry metadata for '+expected.name+'@'+expected.version);
+          NODE
