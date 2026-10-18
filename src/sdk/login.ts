@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { FiredrillError } from "./errors.js";
+import { resolveApiUrl } from "./api-origin.js";
 import { LoginStore } from "./login-store.js";
 import { startDeviceAuthorization, refreshProviderTokens, type QualificationTiming } from "./device-authorization.js";
 
@@ -19,7 +20,8 @@ interface Configuration { schemaVersion: typeof VERSION; provider: "workos"; cli
 export interface LoginCredential { id: string; organizationId: string; expiresAt: string; capabilities: string[] }
 export interface LoginStatus { apiUrl: string; source: "protected_login"; signedIn: boolean; credential?: LoginCredential }
 export interface LoginOptions {
-  apiUrl: string;
+  /** @deprecated Production is automatic. Alternate service addresses are rejected. */
+  apiUrl?: string;
   /** Owner-only local state outside every repository. Defaults to ~/.local/state/firedrill/login. */
   storeDirectory?: string;
   /** Explicit protocol qualification only. Normal clients always use the fixed provider endpoints. */
@@ -48,11 +50,7 @@ const invalid = () => new FiredrillError("FD_LOGIN_INVALID_RESPONSE", "Sign-in r
 const pending = () => new FiredrillError("FD_LOGIN_REFRESH_PENDING", "The previous refresh result is uncertain; it was not repeated.", "Within 25 seconds, a human may explicitly run firedrill login --retry-refresh once. Otherwise use firedrill login --reauthorize. Protected state was preserved.", { uncertain: true });
 const object = (value: unknown): Record<string, unknown> => { if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid(); return value as Record<string, unknown>; };
 const string = (value: unknown, max = 8192): value is string => typeof value === "string" && value.length > 0 && value.length <= max && !/[\s\x00-\x1f\x7f]/.test(value);
-export function loginApiOrigin(value: string): string {
-  let url: URL; try { url = new URL(value); } catch { throw new FiredrillError("API_URL_INVALID", "A valid API origin is required for sign-in.", "Select HTTPS or an explicit loopback HTTP origin."); }
-  if (url.username || url.password || url.search || url.hash || !["", "/"].includes(url.pathname) || !(url.protocol === "https:" || url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))) throw new FiredrillError("API_URL_INVALID", "Sign-in requires an exact HTTPS or loopback HTTP origin.", "Remove credentials, path, query and fragment from the API origin.");
-  return url.origin;
-}
+export const loginApiOrigin = resolveApiUrl;
 function configuration(value: unknown): Configuration {
   const item = object(value);
   if (item.schemaVersion !== VERSION || item.provider !== "workos" || !string(item.clientId, 136) || !/^client_[A-Za-z0-9_-]{1,128}$/.test(item.clientId) || !string(item.verificationOrigin, 2048)) throw invalid();
@@ -135,10 +133,11 @@ async function request(apiUrl: string, path: string, options: { token?: string; 
 
 /** Human-approved sign-in management. No browser is launched by this SDK. */
 export class FiredrillLogin {
-  readonly apiUrl: string;
+  readonly #apiUrl: string;
+  get apiUrl(): string { return this.#apiUrl; }
   readonly #options: LoginOptions;
   readonly #store: LoginStore;
-  constructor(options: LoginOptions) { this.apiUrl = loginApiOrigin(options.apiUrl); this.#options = options; this.#store = new LoginStore(this.apiUrl, options.storeDirectory); }
+  constructor(options: LoginOptions = {}) { this.#apiUrl = loginApiOrigin(options.apiUrl); this.#options = options; this.#store = new LoginStore(this.apiUrl, options.storeDirectory); }
   #now() { return this.#options.qualification?.timing?.nowMs() ?? Date.now(); }
   async #configuration(saved: State | undefined, signal?: AbortSignal) {
     const current = configuration(await request(this.apiUrl, "/v1/auth/config", { signal }));

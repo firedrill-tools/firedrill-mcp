@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { CONTRACT_VERSION, TARGET_EXECUTION_VERSION, RecipeSchema, JsonSchema, ReassessmentSchema, readValidationDiagnostics } from "../contracts/index.js";
 import { FiredrillError, definitionError } from "./errors.js";
+import { normalizeApiUrl, resolveApiUrl } from "./api-origin.js";
+export { FIREDRILL_API_ORIGIN, normalizeApiUrl, resolveApiUrl } from "./api-origin.js";
 import { readServiceBuildErrorDetails } from "./service-build-diagnostics.js";
 import { JournalStore } from "./journal.js";
 import { event, executeTarget } from "./targets.js";
@@ -70,21 +72,9 @@ function simulationResult(result, operationId, ci) {
 }
 function terminal(run) { return !["queued", "running"].includes(run.execution); }
 function id(value) { return encodeURIComponent(value); }
-export function normalizeApiUrl(value) {
-    let url;
-    try {
-        url = new URL(value);
-    }
-    catch {
-        throw new FiredrillError("API_URL_INVALID", "API URL is not valid.", "Use an HTTPS origin or explicit loopback HTTP origin.");
-    }
-    if (url.username || url.password || url.search || url.hash || !["", "/"].includes(url.pathname) ||
-        !(url.protocol === "https:" || url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))
-        throw new FiredrillError("API_URL_INVALID", "Use an HTTPS origin, or explicit loopback HTTP, without userinfo, path, query or fragment.", "Set FIREDRILL_API_URL to the control origin.");
-    return url.origin;
-}
 export class Firedrill {
-    apiUrl;
+    #apiUrl;
+    get apiUrl() { return this.#apiUrl; }
     projectId;
     environmentId;
     #token;
@@ -113,10 +103,7 @@ export class Firedrill {
         if (journalDirectory !== undefined && (typeof journalDirectory !== "string" || !journalDirectory.trim() || journalDirectory.includes("\0")))
             throw new FiredrillError("JOURNAL_UNSAFE", "The selected recovery directory is empty or invalid.", "Set FIREDRILL_JOURNAL_DIRECTORY to a private owned directory, or pass journalDirectory explicitly.");
         this.options = { ...safeOptions, journalDirectory };
-        const apiUrl = options.apiUrl ?? process.env.FIREDRILL_API_URL;
-        if (!apiUrl)
-            throw new FiredrillError("API_URL_REQUIRED", "No Firedrill API origin is configured.", "Set FIREDRILL_API_URL or pass apiUrl.");
-        this.apiUrl = normalizeApiUrl(apiUrl);
+        this.#apiUrl = resolveApiUrl(options.apiUrl);
         this.#token = options.token ?? process.env.FIREDRILL_TOKEN;
         if (this.#token !== undefined && (typeof this.#token !== "string" || !this.#token || /[\s\x00-\x1f\x7f]/.test(this.#token) || this.#token.length > 8192))
             throw new FiredrillError("AUTH_REQUIRED", "The explicitly selected Firedrill credential is invalid.", "Correct or unset the explicit token. A protected login never silently replaces an explicit token.");

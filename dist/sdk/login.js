@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { FiredrillError } from "./errors.js";
+import { resolveApiUrl } from "./api-origin.js";
 import { LoginStore } from "./login-store.js";
 import { startDeviceAuthorization, refreshProviderTokens } from "./device-authorization.js";
 const VERSION = "2026-10-14-login.1";
@@ -10,18 +11,7 @@ const pending = () => new FiredrillError("FD_LOGIN_REFRESH_PENDING", "The previo
 const object = (value) => { if (!value || typeof value !== "object" || Array.isArray(value))
     throw invalid(); return value; };
 const string = (value, max = 8192) => typeof value === "string" && value.length > 0 && value.length <= max && !/[\s\x00-\x1f\x7f]/.test(value);
-export function loginApiOrigin(value) {
-    let url;
-    try {
-        url = new URL(value);
-    }
-    catch {
-        throw new FiredrillError("API_URL_INVALID", "A valid API origin is required for sign-in.", "Select HTTPS or an explicit loopback HTTP origin.");
-    }
-    if (url.username || url.password || url.search || url.hash || !["", "/"].includes(url.pathname) || !(url.protocol === "https:" || url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))
-        throw new FiredrillError("API_URL_INVALID", "Sign-in requires an exact HTTPS or loopback HTTP origin.", "Remove credentials, path, query and fragment from the API origin.");
-    return url.origin;
-}
+export const loginApiOrigin = resolveApiUrl;
 function configuration(value) {
     const item = object(value);
     if (item.schemaVersion !== VERSION || item.provider !== "workos" || !string(item.clientId, 136) || !/^client_[A-Za-z0-9_-]{1,128}$/.test(item.clientId) || !string(item.verificationOrigin, 2048))
@@ -165,10 +155,11 @@ async function request(apiUrl, path, options = {}) {
 }
 /** Human-approved sign-in management. No browser is launched by this SDK. */
 export class FiredrillLogin {
-    apiUrl;
+    #apiUrl;
+    get apiUrl() { return this.#apiUrl; }
     #options;
     #store;
-    constructor(options) { this.apiUrl = loginApiOrigin(options.apiUrl); this.#options = options; this.#store = new LoginStore(this.apiUrl, options.storeDirectory); }
+    constructor(options = {}) { this.#apiUrl = loginApiOrigin(options.apiUrl); this.#options = options; this.#store = new LoginStore(this.apiUrl, options.storeDirectory); }
     #now() { return this.#options.qualification?.timing?.nowMs() ?? Date.now(); }
     async #configuration(saved, signal) {
         const current = configuration(await request(this.apiUrl, "/v1/auth/config", { signal }));

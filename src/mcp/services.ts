@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { DatasetPolicySchema, DatasetMetadataSchema, JsonSchema, ScopeSchema, type Principal, type ServiceCatalogRelease, type ServiceCatalogAcquisition } from "../contracts/index.js";
-import { FiredrillError, FiredrillServices, executeToolStart, validateToolStartPlan, readServiceBuildFailure, type ToolStartPlan, type ToolStartResult } from "../sdk/index.js";
+import { FiredrillError, FiredrillServices, executeToolStart, validateToolStartPlan, readServiceBuildFailure, FIREDRILL_API_ORIGIN, type ToolStartPlan, type ToolStartResult } from "../sdk/index.js";
 
 // Transport declarations only. The service validates the authoritative manifest,
 // source capabilities, state schemas and lifecycle; no private engine is imported.
@@ -97,8 +97,8 @@ function compactToolStart(value: ToolStartResult, plan: ToolStartPlan, apiUrl: s
       fullProjection: { bytes: Buffer.byteLength(serialized), sha256: createHash("sha256").update(serialized).digest("hex"), hashFormat: "utf8_JSON_stringify_projection" },
       note: "Items contain real minimal identities; omittedItems states whether this is only a prefix. Counts cover every returned setup item. Omitted identities are not failures or nonexistent resources; no current access or target execution is inferred." },
     originalIntent: { sha256: createHash("sha256").update(canonical(intent)).digest("hex"), hashFormat: "utf8_sorted_key_JSON_of_apiUrl_scope_operationKey_normalized_plan", planIncluded: false, planRequired: "original_unchanged_customer_retained_plan" },
-    continuation: { kind: "native_original_intent", replace: ["ORIGINAL_PLAN.json"],
-      argv: ["firedrill", "tools", "start", "ORIGINAL_PLAN.json", "--idempotency-key", value.operationKey, "--api-url", apiUrl, "--project", value.projectId, "--environment", value.environmentId, "--json", "--non-interactive"],
+    continuation: apiUrl !== FIREDRILL_API_ORIGIN ? { kind: "private_environment", note: "Use this environment's separately built maintainer client and original plan/key. Do not replay these IDs or credentials in the production client." } : { kind: "native_original_intent", replace: ["ORIGINAL_PLAN.json"],
+      argv: ["firedrill", "tools", "start", "ORIGINAL_PLAN.json", "--idempotency-key", value.operationKey, "--project", value.projectId, "--environment", value.environmentId, "--json", "--non-interactive"],
       sdk: { typescript: "client.services.start(originalPlan, { operationKey: savedKey })", python: "client.services.start(original_plan, operation_key=saved_key)" },
       note: "Use the original unchanged plan/key and authorized identity/scope. Native reconciliation reuses exact service receipts and may finish pending allocations in that original intent; it is not read-only and never starts a target or invents replacement instances. CLI plan files have a 256 KiB input bound; use a native SDK for larger retained plans. No remote customer-machine journal or single group-read endpoint is implied." },
     readShownInstance: { tool: "firedrill_service_read", replace: ["INSTANCE_ID_FROM_SHOWN_ITEM"], arguments: { request: { action: "instance", projectId: value.projectId, environmentId: value.environmentId, instanceId: "INSTANCE_ID_FROM_SHOWN_ITEM" } } },

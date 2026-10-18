@@ -1,4 +1,4 @@
-import { FiredrillError } from "../sdk/index.js";
+import { FiredrillError, FIREDRILL_API_ORIGIN } from "../sdk/index.js";
 const record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const safeId = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,159}$/.test(value);
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
@@ -18,8 +18,15 @@ export function batchContinuation(batch, selection) {
         throw new FiredrillError("FD_MCP_BATCH_RECEIPT_UNCONFIRMED", "The service did not confirm the created batch's identity, scope and target kind.", "Preserve the original submission and operation key. No runner command is offered for this unconfirmed response; do not create a replacement batch.", { uncertain: true, validation: { reconciliation } });
     }
     const batchId = batch.id;
+    if (selection.apiUrl !== FIREDRILL_API_ORIGIN)
+        return {
+            kind: "private_environment", batchId, apiUrl: selection.apiUrl,
+            projectId: selection.projectId, environmentId: selection.environmentId, reconciliation,
+            inspection: { readOnly: true, mcp: { tool: "firedrill_batch", arguments: { batchId, projectId: selection.projectId, environmentId: selection.environmentId } } },
+            note: "This private service is not the customer production destination. Use its separately built maintainer client; do not copy its IDs or credentials into the public CLI/SDK. No production runner command is offered.",
+        };
     const scopedCommand = (action) => {
-        const argv = ["firedrill", action, batchId, "--api-url", selection.apiUrl,
+        const argv = ["firedrill", action, batchId,
             "--project", selection.projectId, "--environment", selection.environmentId,
             "--view", "operator", "--json", "--non-interactive"];
         return { argv, command: `firedrill ${argv.slice(1).map(quote).join(" ")}` };
@@ -41,12 +48,12 @@ export function batchContinuation(batch, selection) {
         return { ...common, kind: "cli_runner", ...scopedCommand("run"),
             execution: "Run this command from the customer's prepared repository only when execution is authorized. It attaches to this retained batch; it does not submit another recipe. The command/HTTP target runs through that customer-owned process, not the remote MCP server." };
     }
-    const clientOptions = { apiUrl: selection.apiUrl, projectId: selection.projectId, environmentId: selection.environmentId };
+    const clientOptions = { projectId: selection.projectId, environmentId: selection.environmentId };
     if (selection.target.kind === "native") {
         return { ...common, kind: "sdk_callback_required",
             sdk: {
                 typescript: { clientOptions, method: "client.run", batchId, binding: "Pass the existing native callback as the second argument in the customer's process." },
-                python: { clientOptions: { api_url: selection.apiUrl, project_id: selection.projectId, environment_id: selection.environmentId },
+                python: { clientOptions: { project_id: selection.projectId, environment_id: selection.environmentId },
                     method: "client.run", batch_id: batchId, binding: "Pass the existing native callback as target in the customer's process; await the call for AsyncFiredrill." },
                 concurrency: "Native callbacks share process memory. Parallel execution requires the explicit targetExecution acknowledgement already retained in the admitted recipe. run/resume cannot add that policy through allowParallel or allow_parallel; keep the original recipe unchanged.",
             },

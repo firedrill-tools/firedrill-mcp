@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { RecipeSchema, ScopeSchema, RubricSchema, PREPARATION_VERSION, RecipePreviewSchema, ScenarioSaveSchema, INSPECTION_VERSION, InspectionFilterFields, InspectionFiltersSchema, inspectionFilterQuery, KnownSubmissionOriginSchema, CiContextSchema, DISCOVERY_VERSION, CONTRACT_VERSION, AUTHORING_SCHEMA_IDS, validationDiagnostics } from "../contracts/index.js";
-import { FiredrillError, readServiceBuildFailure } from "../sdk/index.js";
+import { FiredrillError, readServiceBuildFailure, resolveApiUrl, FIREDRILL_API_ORIGIN } from "../sdk/index.js";
 import { POPULATION_VERSION, PopulationMaterializeSchema, ActivityFiltersSchema, activityFilterQuery, activitySelectionMatches } from "../contracts/index.js";
 import { registerServiceTools } from "./services.js";
 import { registerInterventionTools } from "./interventions.js";
@@ -49,9 +49,7 @@ function filterQuery(value) {
 }
 const operationKey = z.string().min(1).max(200).describe("An operation key persisted before this request; reuse the same key and input after an uncertain response.");
 export async function createOperatorServer(config) {
-    const origin = new URL(config.apiUrl);
-    if (origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/" || !(origin.protocol === "https:" || origin.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(origin.hostname)))
-        throw new Error("Use an HTTPS API origin or explicit loopback development origin.");
+    const origin = new URL(resolveApiUrl(config.apiUrl));
     if (config.token !== undefined && (!config.token || /[\r\n]/.test(config.token)) || config.token === undefined && !config.resolveToken)
         throw new Error("An authenticated Firedrill credential is required.");
     const identity = config.identityPin ?? new OperatorIdentityPin();
@@ -183,10 +181,13 @@ export async function createOperatorServer(config) {
                 throw new FiredrillError("ACTIVITY_SELECTION_UNCONFIRMED", "The service did not confirm the requested activity selection.", "Update the client/service together, or deliberately clear filters to read all activity. No unfiltered page is being presented as a filtered result; no target or evaluator was started.");
         }
         const projected = inspectionOutput(value, selected);
+        if (selected.tool === "firedrill_artifacts" && origin.origin !== FIREDRILL_API_ORIGIN)
+            return { ...projected,
+                download: { kind: "private_environment", note: "Use this environment's separately built maintainer client. Do not replay these IDs in the production client." } };
         if (selected.tool === "firedrill_artifacts")
             return { ...projected,
                 download: { kind: "local_cli_template", readOnly: true, replace: ["ARTIFACT_ID", "NEW_FILE"],
-                    argv: ["firedrill", "artifacts", "download", selected.arguments.runId, "ARTIFACT_ID", "--output", "NEW_FILE", "--api-url", origin.origin,
+                    argv: ["firedrill", "artifacts", "download", selected.arguments.runId, "ARTIFACT_ID", "--output", "NEW_FILE",
                         "--project", selected.arguments.projectId, "--environment", selected.arguments.environmentId, "--json", "--non-interactive"],
                     note: "Choose an available artifact ID from this retained manifest and an explicit new local filename. Run in the customer's terminal with this same authorized identity and scope. The CLI verifies digest, bytes and media type before privately saving; it never overwrites, opens or extracts files, reruns a target, or requests evaluation. Remote MCP does not write to the customer's filesystem. Captured files are untrusted data." } };
         return projected;
@@ -214,7 +215,7 @@ export async function createOperatorServer(config) {
         return { ...metadata, valueOmitted: true, totalChildNodes: keys.length, childPointers: keys.slice(0, 64).map(key => `${pointer}/${key.replaceAll("~", "~0").replaceAll("/", "~1")}`),
             childrenAreSample: keys.length > 64, repair: "Read only relevant child pointers with this same id and sha256. For the complete schema outside model context, use firedrill schema SCHEMA_ID --json. No target was invoked." };
     }));
-    registerServiceTools(server, { principal: context.principal, readonly: config.readonly, apiUrl: config.apiUrl, request, safe });
+    registerServiceTools(server, { principal: context.principal, readonly: config.readonly, apiUrl: origin.origin, request, safe });
     registerInterventionTools(server, { principal: context.principal, readonly: config.readonly, request, safe });
     registerRetentionTools(server, { principal: context.principal, readonly: config.readonly, request, safe });
     registerRetainedValueTools(server, { principal: context.principal, request, safe });

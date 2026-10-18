@@ -18,12 +18,6 @@
       },
       "environmentVariables": [
         {
-          "name": "FIREDRILL_API_URL",
-          "description": "Exact approved Firedrill API origin; required, no inferred default.",
-          "isRequired": true,
-          "format": "string"
-        },
-        {
           "name": "FIREDRILL_TOKEN",
           "description": "Optional scoped CI credential from the caller's secret store; otherwise use protected operator login.",
           "isSecret": true,

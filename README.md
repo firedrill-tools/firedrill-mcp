@@ -29,10 +29,10 @@ The CLI package also includes the same `firedrill-mcp` binary: install one owner
 of that binary per application, not both packages.
 
 In a host that supports stdio MCP, configure command `npx`, arguments
-`["--no-install", "firedrill-mcp"]`, the application's working directory, and
-`FIREDRILL_API_URL` set to the exact approved API origin from the release handoff.
+`["--no-install", "firedrill-mcp"]` and the application's working directory.
+Production is automatic; no API-address environment variable is needed.
 If the host cannot set a working directory, use the absolute installed binary
-path instead. Do not guess an API hostname or put a credential in the config.
+path instead. Alternate API addresses are rejected. Do not put a credential in the config.
 
 The client reuses the protected Firedrill login for that exact origin. Otherwise
 `firedrill_authenticate` starts an explicit device approval: show the human its

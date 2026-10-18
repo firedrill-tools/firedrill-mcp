@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { CONTRACT_VERSION, TARGET_EXECUTION_VERSION, RecipeSchema, JsonSchema, ReassessmentSchema, readValidationDiagnostics, type ClaimedRun, type RecipeInput, type Recipe, type Batch, type BatchResult, type ClaimResponse, type Run, type RunReport, type RunEvent, type Project, type Principal, type ArtifactReference, type AssessmentRecord } from "../contracts/index.js";
 import { FiredrillError, definitionError } from "./errors.js";
+import { normalizeApiUrl, resolveApiUrl } from "./api-origin.js";
+export { FIREDRILL_API_ORIGIN, normalizeApiUrl, resolveApiUrl } from "./api-origin.js";
 import { readServiceBuildErrorDetails } from "./service-build-diagnostics.js";
 import { JournalStore, type Journal, type Work } from "./journal.js";
 import { event, executeTarget, type NativeTarget, type TargetOutcome } from "./targets.js";
@@ -116,7 +118,9 @@ export type { RecipePreview, SavedScenario, ScenarioSaveInput } from "../contrac
 export type { ServiceCatalogPage, ServiceCatalogRelease, AcquireServiceCatalogInput, ServiceCatalogAcquisition, ServiceCatalogAcquisitionPhase } from "../contracts/index.js";
 
 export interface FiredrillOptions {
-  apiUrl?: string; token?: string; projectId?: string; environmentId?: string;
+  /** @deprecated Production is automatic. Alternate service addresses are rejected. */
+  apiUrl?: string;
+  token?: string; projectId?: string; environmentId?: string;
   journalDirectory?: string; requestTimeoutMs?: number;
   /** Protected CLI login state; never a repository path. Explicit tokens always take precedence. */
   loginStoreDirectory?: string;
@@ -150,16 +154,9 @@ function simulationResult(result: BatchResult, operationId: string, ci?: CiConte
 }
 function terminal(run: Run): boolean { return !["queued", "running"].includes(run.execution); }
 function id(value: string): string { return encodeURIComponent(value); }
-export function normalizeApiUrl(value: string): string {
-  let url: URL;
-  try { url = new URL(value); } catch { throw new FiredrillError("API_URL_INVALID", "API URL is not valid.", "Use an HTTPS origin or explicit loopback HTTP origin."); }
-  if (url.username || url.password || url.search || url.hash || !["", "/"].includes(url.pathname) ||
-    !(url.protocol === "https:" || url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)))
-    throw new FiredrillError("API_URL_INVALID", "Use an HTTPS origin, or explicit loopback HTTP, without userinfo, path, query or fragment.", "Set FIREDRILL_API_URL to the control origin.");
-  return url.origin;
-}
 export class Firedrill {
-  readonly apiUrl: string;
+  readonly #apiUrl: string;
+  get apiUrl(): string { return this.#apiUrl; }
   readonly projectId?: string;
   readonly environmentId?: string;
   readonly #token: string | undefined;
@@ -188,9 +185,7 @@ export class Firedrill {
     if (journalDirectory !== undefined && (typeof journalDirectory !== "string" || !journalDirectory.trim() || journalDirectory.includes("\0")))
       throw new FiredrillError("JOURNAL_UNSAFE", "The selected recovery directory is empty or invalid.", "Set FIREDRILL_JOURNAL_DIRECTORY to a private owned directory, or pass journalDirectory explicitly.");
     this.options = { ...safeOptions, journalDirectory };
-    const apiUrl = options.apiUrl ?? process.env.FIREDRILL_API_URL;
-    if (!apiUrl) throw new FiredrillError("API_URL_REQUIRED", "No Firedrill API origin is configured.", "Set FIREDRILL_API_URL or pass apiUrl.");
-    this.apiUrl = normalizeApiUrl(apiUrl);
+    this.#apiUrl = resolveApiUrl(options.apiUrl);
     this.#token = options.token ?? process.env.FIREDRILL_TOKEN;
     if (this.#token !== undefined && (typeof this.#token !== "string" || !this.#token || /[\s\x00-\x1f\x7f]/.test(this.#token) || this.#token.length > 8192)) throw new FiredrillError("AUTH_REQUIRED", "The explicitly selected Firedrill credential is invalid.", "Correct or unset the explicit token. A protected login never silently replaces an explicit token.");
     this.projectId = options.projectId ?? process.env.FIREDRILL_PROJECT_ID;

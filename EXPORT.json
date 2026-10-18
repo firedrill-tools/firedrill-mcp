@@ -4,9 +4,9 @@
   "version": "2.0.0-alpha.9",
   "artifact": {
     "filename": "firedrill-run-mcp-2.0.0-alpha.9.tgz",
-    "sha256": "689c506425d13b4efe74b0ed1af438be18aadc4106818a50d92d7fa7f128b67d",
-    "bytes": 629390,
-    "manifestSha256": "a0e73d8000cc3b095f182d0019a0cb2ab28a7cb4a282a4a54605d9a9081e8113"
+    "sha256": "605a3d0928153f5f234fd700c99a00954d533531d65a4d97aabbce6e9b1edaea",
+    "bytes": 629963,
+    "manifestSha256": "5cce22ad1ce0cccf4a246e96cbe2606b47c0c00742129834b50de31bc18c5838"
   },
   "files": [
     {
@@ -146,8 +146,8 @@
     },
     {
       "path": "dist/mcp/batch-continuation.js",
-      "bytes": 5654,
-      "sha256": "5166500844f1655a8166949e7009574844ac651344b934aae7831162c74b1856"
+      "bytes": 6252,
+      "sha256": "c5c0a7b0812e68eb0c9784f36cb337d8cf09746d32d1af10e9aaebff86a89523"
     },
     {
       "path": "dist/mcp/follow.js",
@@ -171,8 +171,8 @@
     },
     {
       "path": "dist/mcp/main.js",
-      "bytes": 912,
-      "sha256": "6f6d1d036c27a5b5c75841d32ed7a468dd6f688f17c778a589272923a8481331"
+      "bytes": 755,
+      "sha256": "c3edf1f5dc6578b55caf30922256f7d963a82d37124fe2465f9f7a6cbf3f0711"
     },
     {
       "path": "dist/mcp/readonly.js",
@@ -196,18 +196,23 @@
     },
     {
       "path": "dist/mcp/server.js",
-      "bytes": 43743,
-      "sha256": "056e6b65a4c042c288192e6080526b8e8af296994e8adcce7453c87e1319ae9b"
+      "bytes": 43749,
+      "sha256": "7c73a812b6781cfe916787ae910fcdbd0e2a4944bcc64672cc94e123645a3e15"
     },
     {
       "path": "dist/mcp/services.js",
-      "bytes": 32327,
-      "sha256": "fa43541157230dc00855a32ffbf336eb02d96943c2d3539b87e306b3011a53f1"
+      "bytes": 32551,
+      "sha256": "74b61915b4fcf87d5e1cb29488ea67c256e8cdf7e7229accf6d22696cba876c5"
     },
     {
       "path": "dist/sdk/activity.js",
       "bytes": 3869,
       "sha256": "a5fdcb2ab6d88dadcd8b313c7db97ae5c3e5d744f4b2ee103c22983e031cd905"
+    },
+    {
+      "path": "dist/sdk/api-origin.js",
+      "bytes": 1157,
+      "sha256": "c34cfa236be76d27af40506db2c260445b0f313eaae89e8c8fd5515408e3ef2a"
     },
     {
       "path": "dist/sdk/artifact-downloads.js",
@@ -261,8 +266,8 @@
     },
     {
       "path": "dist/sdk/index.js",
-      "bytes": 77707,
-      "sha256": "2054544b4f593748ea9fb1f5d086064a6f0a7fa59f4f301a1ed7c10f6f8b1761"
+      "bytes": 76973,
+      "sha256": "8e5bc8caa4e3f79605dd77e52b7575194a257f3427612bd70f431d0af746271a"
     },
     {
       "path": "dist/sdk/input-files.js",
@@ -301,8 +306,8 @@
     },
     {
       "path": "dist/sdk/login.js",
-      "bytes": 29143,
-      "sha256": "b0ab319d23e5a8fb5a08ae99c3c791f799de2fe0148ff06d32276be3a5c941c6"
+      "bytes": 28586,
+      "sha256": "c104baa124a31fe14bfa4a9fc67eef78cd63faf56e816ff1ab8655c684087514"
     },
     {
       "path": "dist/sdk/observations.js",
@@ -406,18 +411,18 @@
     },
     {
       "path": "PACKAGING.json",
-      "bytes": 131370,
-      "sha256": "a0e73d8000cc3b095f182d0019a0cb2ab28a7cb4a282a4a54605d9a9081e8113"
+      "bytes": 132364,
+      "sha256": "5cce22ad1ce0cccf4a246e96cbe2606b47c0c00742129834b50de31bc18c5838"
     },
     {
       "path": "README.md",
-      "bytes": 5058,
-      "sha256": "b15f62219a86d8cfb89f073d8f6a59aca51e953158288388845112100bf067ff"
+      "bytes": 5059,
+      "sha256": "1eb083ea899cd607ab621130c7165671d3104565fbce0546365f05afc4ee2df7"
     },
     {
       "path": "server.json",
-      "bytes": 1274,
-      "sha256": "a643f8cae7d0fdc6541a45005004a37640eeb8e2a55234d5c8bf7a9e835f7275"
+      "bytes": 1059,
+      "sha256": "d1916fc43ace74c829683f3c7af6f87d2347c6cf245183e765c77245e7c08164"
     },
     {
       "path": "src/contracts/activity-filters.ts",
@@ -541,8 +546,8 @@
     },
     {
       "path": "src/mcp/batch-continuation.ts",
-      "bytes": 5830,
-      "sha256": "6110a90427e11c183c68402eb39aab0499ceb6bfb3cbecec7d9d7c7afbc20b3b"
+      "bytes": 6389,
+      "sha256": "d19b58782c383eda7aa4a44cbfed9ea00e25868634b5bbf27a5f89901f923ff4"
     },
     {
       "path": "src/mcp/follow.ts",
@@ -566,8 +571,8 @@
     },
     {
       "path": "src/mcp/main.ts",
-      "bytes": 897,
-      "sha256": "d3155336ea85132547d01f4fe173f0f4cb587636abf17e7db94195c2894f13c1"
+      "bytes": 748,
+      "sha256": "896c1dc2bc88400c5358d7b408e10a19580647673dc49d695683294c4eab4f41"
     },
     {
       "path": "src/mcp/readonly.ts",
@@ -591,18 +596,23 @@
     },
     {
       "path": "src/mcp/server.ts",
-      "bytes": 42827,
-      "sha256": "b5c0819b38c6f0148449b6e2af3d65c79eb5107330b32fb486a26646700795b1"
+      "bytes": 42828,
+      "sha256": "96db1d2792a125ce46cb3b57036b3fd447285c624b27e04381698c01a10d2de0"
     },
     {
       "path": "src/mcp/services.ts",
-      "bytes": 31267,
-      "sha256": "3da47c91b77066d40786ca41e8d2a260f338cebd146f9ae0d1818457c73e53aa"
+      "bytes": 31491,
+      "sha256": "297ad079866491133d8d578fdcee4189ab7f4b55510b6f0c8360996f80bff327"
     },
     {
       "path": "src/sdk/activity.ts",
       "bytes": 4118,
       "sha256": "5c8908e1a80813653c1128421c7bc8c8bd82611be4a14e9475af9cc39d17eef4"
+    },
+    {
+      "path": "src/sdk/api-origin.ts",
+      "bytes": 1180,
+      "sha256": "38fcc063a48392ab7cc44f04ceeedb924e477fe0d7c26973cc7b6bb7e5ed925a"
     },
     {
       "path": "src/sdk/artifact-downloads.ts",
@@ -656,8 +666,8 @@
     },
     {
       "path": "src/sdk/index.ts",
-      "bytes": 81109,
-      "sha256": "758912fa1445642a9614c668f7b04e408b45012a0236256b463f8901c17140d3"
+      "bytes": 80514,
+      "sha256": "3bc1a2da045213ba1b6c32fdc5861f6e5fa365f6c1cf49313c1ae32ca6cae052"
     },
     {
       "path": "src/sdk/input-files.ts",
@@ -696,8 +706,8 @@
     },
     {
       "path": "src/sdk/login.ts",
-      "bytes": 29998,
-      "sha256": "646371db7662cca3a4eba379d192e6bc3f883050b9c4d6a2448cf996616b22c5"
+      "bytes": 29561,
+      "sha256": "956c4376a993e1f44469368bfcdf89582e053e09f7432c1ffdf000212b4ae1c5"
     },
     {
       "path": "src/sdk/observations.ts",
@@ -750,7 +760,7 @@
       "sha256": "6cb25d85fbfe918c9551266c6bba3dce686c82158a3d502b76691a2034429dc1"
     }
   ],
-  "sourceSnapshotSha256": "439e12d3f00823e576a801424866f28c1bda4feabf0a302ff3a6c9e5ab89841e",
+  "sourceSnapshotSha256": "f62f49affe29420161bb1f6beab6859b25336490829d094a1446032d0d177ee3",
   "boundary": "Client-only source export. No credentials, private runtime, service, database or repository history. Build/packaging construction is not runtime qualification.",
   "published": false,
   "listed": false
