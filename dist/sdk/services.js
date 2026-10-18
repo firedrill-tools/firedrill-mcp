@@ -204,8 +204,8 @@ export class FiredrillServices {
     }
     seed(input, idempotencyKey) {
         id(input.buildId);
-        if (!Array.isArray(input.records) || input.records.length > 10000)
-            fail("SERVICE_DATASET_INVALID", "Seed records must be an explicit array of at most 10,000 records.", "Use [] for an intentionally empty dataset; no sample data is inferred.");
+        if (!Array.isArray(input.records) || input.records.length > 100000)
+            fail("SERVICE_DATASET_INVALID", "Seed records must be an explicit array of at most 100,000 records.", "Use [] for an intentionally empty dataset; no sample data is inferred.");
         for (const record of input.records)
             object(record.value, "record.value");
         if (input.initialVirtualTimeUs !== undefined)

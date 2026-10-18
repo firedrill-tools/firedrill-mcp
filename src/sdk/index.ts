@@ -449,7 +449,13 @@ export class Firedrill {
       throw error;
     }
   }
-  assessments(runId: string): Promise<{ items: AssessmentRecord[] }> { return this.request("GET", `/v1/runs/${id(runId)}/assessments`); }
+  assessments(runId: string, options: { cursor?: string; limit?: number } = {}): Promise<{ items: AssessmentRecord[]; nextCursor: string | null }> {
+    if (options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100)) throw new FiredrillError("PAGE_INVALID", "limit must be between 1 and 100.", "Use the returned assessment cursor unchanged.");
+    if (options.cursor !== undefined && (typeof options.cursor !== "string" || !/^assessment_[a-f0-9]{24}$/.test(options.cursor))) throw new FiredrillError("PAGE_INVALID", "Use the returned assessment cursor unchanged.", "Omit cursor for the first page; keep the same run and selected scope.");
+    const query = new URLSearchParams({ limit: String(options.limit ?? 100) });
+    if (options.cursor !== undefined) query.set("cursor", options.cursor);
+    return this.request("GET", `/v1/runs/${id(runId)}/assessments?${query}`);
+  }
   assessment(runId: string, assessmentId: string): Promise<AssessmentRecord> { return this.request("GET", `/v1/runs/${id(runId)}/assessments/${id(assessmentId)}`); }
   /** Explicit evaluator action on frozen evidence; never reruns the customer target. */
   async reassess(runId: string, input: { rubric?: NonNullable<AssessmentRecord["rubric"]> }, idempotencyKey: string): Promise<AssessmentRecord> {
