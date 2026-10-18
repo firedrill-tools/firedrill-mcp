@@ -1,0 +1,57 @@
+{
+  "name": "@firedrill-run/mcp",
+  "version": "2.0.0-alpha.9",
+  "private": false,
+  "type": "module",
+  "description": "Authenticated Firedrill operator MCP client over stdio",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/firedrill-tools/firedrill-mcp.git"
+  },
+  "homepage": "https://firedrill.run",
+  "mcpName": "io.github.firedrill-tools/firedrill",
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "v2-alpha"
+  },
+  "bin": {
+    "firedrill-mcp": "./bin/firedrill-mcp.mjs"
+  },
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "build.mjs",
+    "notices",
+    "LICENSE.md",
+    "README.md",
+    "PACKAGING.json",
+    "server.json"
+  ],
+  "dependencies": {
+    "zod": "4.4.3",
+    "@modelcontextprotocol/server": "2.3.1",
+    "@modelcontextprotocol/core": "2.3.1"
+  },
+  "overrides": {
+    "zod": "4.4.3",
+    "@modelcontextprotocol/server": "2.3.1",
+    "@modelcontextprotocol/core": "2.3.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "22.20.5"
+  },
+  "bundledDependencies": [
+    "@modelcontextprotocol/core",
+    "@modelcontextprotocol/server",
+    "zod"
+  ]
+}
