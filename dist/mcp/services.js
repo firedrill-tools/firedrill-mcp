@@ -14,6 +14,9 @@ const absoluteExpiry = z.string().datetime().refine(value => Number.isFinite(Dat
 const object = z.record(z.string(), JsonSchema);
 const scope = ScopeSchema.shape;
 const page = { cursor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0), limit: z.number().int().min(1).max(20).default(10) };
+const searchText = z.string().trim().min(1).max(120).refine(value => !/[\x00-\x1f\x7f]/.test(value));
+const eventKind = z.string().min(1).max(80).regex(/^[a-zA-Z0-9_.:-]+$/);
+const observationFilters = { namespace: z.string().min(1).max(96).optional(), rowQ: searchText.optional(), activityKind: eventKind.optional(), activityQ: searchText.optional(), pendingQ: searchText.optional() };
 const sourcePath = z.string().max(240).regex(/^[A-Za-z0-9][A-Za-z0-9_./-]*\.(?:ts|js|mjs)$/).refine(path => path.split("/").every(part => part && part !== "." && part !== ".." && !part.startsWith(".")), "Use a visible relative source name without traversal.");
 const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
@@ -122,22 +125,22 @@ export function registerServiceTools(server, options) {
     const { principal, request, safe } = options;
     if (principal.capabilities.includes("read"))
         server.registerTool("firedrill_service_read", {
-            description: "Discover qualified built-in catalog metadata, exact acquisition receipts and project-owned service builds/datasets; inspect environment-owned instances/history or retained run-service evidence. Catalog metadata has no pagination; other declared pages are bounded. Explicit scope, no source/credential dumps. Read build includeManifest or one operationId for authoritative authored contracts. Tools remain optional; missing services can be privately authored.",
+            description: "Discover qualified built-in catalog metadata, exact acquisition receipts and project-owned service builds/datasets; inspect environment-owned instances/history or retained run-service evidence. Use instance_history for newest instances with search/status/lifecycle filters; instances retains legacy ascending numeric pages. Filters apply before pagination: clear cursors when changing them; retain epoch while paging observation. Catalog metadata has no pagination; other declared pages are bounded. Explicit scope, no source/credential dumps. Read build includeManifest or one operationId for authoritative authored contracts. Tools remain optional; missing services can be privately authored.",
             inputSchema: z.object({ request: z.discriminatedUnion("action", [
                     z.object({ action: z.literal("catalog"), ...scope }).strict(),
                     z.object({ action: z.literal("catalog_release"), ...scope, catalogId }).strict(),
                     z.object({ action: z.literal("catalog_acquisition"), ...scope, acquisitionId: id }).strict(),
                     z.object({ action: z.literal("catalog_acquisition_by_key"), ...scope, operationKey: key }).strict(),
-                    z.object({ action: z.literal("builds"), ...scope, ...page }).strict(),
+                    z.object({ action: z.literal("builds"), ...scope, ...page, q: searchText.optional(), status: z.enum(["building", "ready", "failed"]).optional() }).strict(),
                     z.object({ action: z.literal("build"), ...scope, buildId: id, includeManifest: z.boolean().default(false), operationId: operationId.optional() }).strict(),
-                    z.object({ action: z.literal("datasets"), ...scope, ...page, buildId: id.optional() }).strict(),
+                    z.object({ action: z.literal("datasets"), ...scope, ...page, buildId: id.optional(), q: searchText.optional() }).strict(),
                     z.object({ action: z.literal("dataset"), ...scope, datasetId: id, includeRecords: z.boolean().default(false), ...page }).strict(),
                     z.object({ action: z.literal("instances"), ...scope, ...page }).strict(),
-                    z.object({ action: z.literal("instance_history"), ...scope, lifecycle: z.enum(["active", "history", "all"]).default("active"), cursor: z.string().min(1).max(4096).optional(), limit: z.number().int().min(1).max(100).default(25) }).strict(),
+                    z.object({ action: z.literal("instance_history"), ...scope, lifecycle: z.enum(["active", "history", "all"]).default("active"), q: searchText.optional(), status: z.enum(["creating", "active", "paused", "recovery_required", "expired", "destroyed"]).optional(), cursor: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).optional(), limit: z.number().int().min(1).max(100).default(25) }).strict(),
                     z.object({ action: z.literal("instance"), ...scope, instanceId: id }).strict(),
-                    z.object({ action: z.literal("history"), ...scope, instanceId: id, ...page }).strict(),
-                    z.object({ action: z.literal("observation"), ...scope, instanceId: id, epoch: epoch.optional(), ...page, evidenceCursor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0) }).strict(),
-                    z.object({ action: z.literal("pending"), ...scope, instanceId: id, epoch: epoch.optional(), ...page }).strict(),
+                    z.object({ action: z.literal("history"), ...scope, instanceId: id, ...page, q: searchText.optional(), kind: eventKind.optional() }).strict(),
+                    z.object({ action: z.literal("observation"), ...scope, instanceId: id, epoch: epoch.optional(), ...page, ...observationFilters, evidenceCursor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0) }).strict(),
+                    z.object({ action: z.literal("pending"), ...scope, instanceId: id, epoch: epoch.optional(), ...page, ...observationFilters }).strict(),
                     z.object({ action: z.literal("conformance"), ...scope, receiptId: id }).strict(),
                     z.object({ action: z.literal("run_services"), ...scope, runId: id }).strict(),
                     z.object({ action: z.literal("run_evidence"), ...scope, runId: id, bindingId: id, source: z.enum(["runtime", "history"]).default("runtime"), ...page }).strict(),

@@ -94,6 +94,8 @@ export async function executeTarget(claim: ClaimedRun, native: NativeTarget | un
       const environment: NodeJS.ProcessEnv = { ...process.env, FIREDRILL_INPUT_JSON: JSON.stringify(run.scenario.input), FIREDRILL_RUN_ID: run.id, FIREDRILL_ATTEMPT_ID: attemptId };
       // Operator authority never becomes a target-process binding.
       delete environment.FIREDRILL_CREDENTIAL; delete environment.FIREDRILL_TOKEN;
+      delete environment.ACTIONS_ID_TOKEN_REQUEST_TOKEN; delete environment.ACTIONS_ID_TOKEN_REQUEST_URL;
+      delete environment.FIREDRILL_CI_RESULT_DIRECTORY; delete environment.FIREDRILL_CI_REPORT;
       type CommandStop = { boundary: "owned_posix_process_group" | "windows_child_only"; state: "group_absent" | "unconfirmed"; leaderClosed: boolean };
       const result = await new Promise<{ code: number | null; stdout: string; stderr: string; error?: string; stop?: CommandStop }>((resolve) => {
         let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0), size = 0, failure: string | undefined;

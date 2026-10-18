@@ -5,5 +5,5 @@ export const AUTHORING_SCHEMA_IDS = [
     "service-binding", "population", "recipe-preview", "scenario-save",
     "reassessment", "run-intervention", "artifact", "machine-credential",
     "service-publication", "service-dataset", "service-instance", "service-connection",
-    "dataset-policy", "dataset-metadata", "ci-context", "activity-filters", "composite-policy", "population-purpose", "task-metric",
+    "dataset-policy", "dataset-metadata", "ci-context", "activity-filters", "composite-policy", "population-purpose", "task-metric", "scenario-recommendation",
 ];

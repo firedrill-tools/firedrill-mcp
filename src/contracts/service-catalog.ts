@@ -10,7 +10,7 @@ export interface ServiceCatalogRelease {
   description: string;
   operations: { id: string; description: string }[];
   fidelity: {
-    interfaces: ("semantic-api" | "mcp" | "declarative-ui")[];
+    interfaces: ("semantic-api" | "mcp" | "declarative-ui" | "browser-ui")[];
     providerNativeHttp: false;
     vendorUi: false;
     description: string;

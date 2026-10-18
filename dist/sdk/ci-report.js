@@ -2,6 +2,7 @@ import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, realpa
 import { dirname, isAbsolute, resolve } from "node:path";
 import { CI_CONTEXT_VERSION, CI_REPORT_VERSION, CiContextSchema, ciContextLinks } from "../contracts/index.js";
 import { batchReceipt } from "./batch-receipt.js";
+import { simulationCiStatus, simulationGateCounts } from "./simulation-exit.js";
 const maximumEntry = 16 * 1024, maximumTotal = 1024 * 1024;
 const executionStates = ["queued", "running", "completed", "error", "interrupted", "cancelled"];
 const assessmentStates = ["not_requested", "pending", "completed", "partial", "unavailable", "error"];
@@ -60,20 +61,25 @@ function markdown(result, context) {
         !["not_configured", "allow", "block", "inconclusive"].includes(result.gate))
         return;
     const assessment = batchReceipt(result).assessmentCounts;
+    const gates = simulationGateCounts(result);
     const original = context === undefined ? null : ciContextLinks(context);
     const evidence = result.lifecycle?.evidence?.state, recovery = result.lifecycle?.recovery?.state;
     const lifecycleText = evidence && ["not_requested", "pending", "complete", "incomplete"].includes(evidence)
         && recovery && ["required", "not_indicated"].includes(recovery)
         ? `Evidence: ${evidence} (declared captures and run-owned Tool closure records only). Recovery: ${recovery}; inspect the retained lifecycle for cleanup gaps. Customer-process stops are runner-reported, not platform-attested.`
         : "Evidence/cleanup lifecycle not reported; completeness and customer-process stop are unknown.";
-    return `\n## Firedrill simulation\n\nBatch: \`${batch.id}\` · ${batch.total} retained cases\n\n` +
-        `| Execution | Cases |\n| --- | ---: |\n${executionStates.map(state => `| ${state} | ${batch.counts[state]} |`).join("\n")}\n\n` +
+    return `\n## Firedrill simulations · ${simulationCiStatus(result)}\n\n` +
+        `${batch.counts.completed} of ${batch.total} runs completed${batch.counts.error ? ` · ${batch.counts.error} execution errors` : ""}.\n\n` +
+        (gates ? `| Passed gate | Failed gate | Needs review | No gate |\n| ---: | ---: | ---: | ---: |\n| ${gates.allow} | ${gates.block} | ${gates.inconclusive} | ${gates.not_configured} |\n\n`
+            : "Whole-population pass/fail counts are unavailable; a sampled page is not counted as the full simulation.\n\n") +
+        (result.gate === "not_configured" ? "No pass/fail gate was configured. Completed execution is not a correctness verdict.\n\n" : "") +
+        `[View full simulation report](<${link}>) · Sign in to Firedrill to view details.\n\n` +
+        `<details><summary>Execution and assessment details</summary>\n\nBatch: \`${batch.id}\`\n\n` +
+        `Execution: ${executionStates.map(state => `${state}: ${batch.counts[state]}`).join(" · ")}.\n\n` +
         `Assessment: ${assessment ? assessmentStates.map(state => `${state}: ${assessment[state]}`).join(" · ") : "whole-population counts unavailable"}.\n\n` +
-        `CI gate: **${result.gate}**. Execution, assessment and gate are separate; this summary does not infer success.\n\n` +
-        `${lifecycleText}\n\n` +
-        `[Open retained report (authentication required)](<${link}>)\n\n` +
-        (original ? `[Originally submitted workflow](<${original.run}>) — caller-declared source context, not execution attestation.\n\n` : "Original workflow context was not recorded.\n\n") +
-        `Written by this opted-in reporting step; a resume may report a batch submitted by another job or workflow run.\n`;
+        `CI gate: ${result.gate}. ${lifecycleText}\n\n` +
+        (original ? `[Original workflow](<${original.run}>) — recorded source context; not independent execution attestation.\n\n` : "Original workflow context was not recorded.\n\n") +
+        `This job may be reporting a retained batch from an earlier workflow.\n\n</details>\n`;
 }
 /** Opt-in local presentation only. Never executes, follows, reassesses or changes
  * a target result. Inputs, outputs, reasons, names and credentials are omitted. */

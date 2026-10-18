@@ -91,6 +91,10 @@ export async function executeTarget(claim, native, outer, attach, tools = {}, st
             // Operator authority never becomes a target-process binding.
             delete environment.FIREDRILL_CREDENTIAL;
             delete environment.FIREDRILL_TOKEN;
+            delete environment.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+            delete environment.ACTIONS_ID_TOKEN_REQUEST_URL;
+            delete environment.FIREDRILL_CI_RESULT_DIRECTORY;
+            delete environment.FIREDRILL_CI_REPORT;
             const result = await new Promise((resolve) => {
                 let stdout = Buffer.alloc(0), stderr = Buffer.alloc(0), size = 0, failure;
                 let stopping, stopReceipt, closed = false, settled = false, code = null;
