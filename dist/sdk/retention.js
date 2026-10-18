@@ -3,7 +3,7 @@ import { FiredrillError, definitionError } from "./errors.js";
 export { RETENTION_VERSION } from "../contracts/index.js";
 const previewInput = RemovalPreviewSchema.omit({ schemaVersion: true, projectId: true, environmentId: true });
 const commitInput = RemovalCommitSchema.omit({ schemaVersion: true, projectId: true, environmentId: true });
-const kinds = new Set(["batch", "run", "scenario", "build", "dataset", "instance", "artifact"]);
+const kinds = new Set(["batch", "run", "scenario", "build", "dataset", "instance", "artifact", "recommendation"]);
 function removalId(value) {
     if (typeof value !== "string" || !/^removal_[a-f0-9]{24}$/.test(value))
         throw new FiredrillError("REMOVAL_ID_INVALID", "Select an exact retained removal ID.", "Use the ID from the original removal receipt; never create a replacement merely to inspect progress.");
@@ -23,7 +23,7 @@ export class FiredrillRetention {
         this.request = request;
     }
     query(options = {}) {
-        if (Object.keys(options).some(name => !["cursor", "limit", "kind", "id"].includes(name)) || options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100) || options.kind !== undefined && !kinds.has(options.kind) || options.cursor !== undefined && (typeof options.cursor !== "string" || !/^ret_[a-f0-9]{24}$/.test(options.cursor)) || options.id !== undefined && (typeof options.id !== "string" || !/^(ret|batch|run|sbuild|dataset|instance)_[a-f0-9]{24}$/.test(options.id)))
+        if (Object.keys(options).some(name => !["cursor", "limit", "kind", "id"].includes(name)) || options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 100) || options.kind !== undefined && !kinds.has(options.kind) || options.cursor !== undefined && (typeof options.cursor !== "string" || !/^ret_[a-f0-9]{24}$/.test(options.cursor)) || options.id !== undefined && (typeof options.id !== "string" || !/^(ret|batch|run|sbuild|dataset|instance|recommendation)_[a-f0-9]{24}$/.test(options.id)))
             throw new FiredrillError("RETENTION_PAGE_INVALID", "Retention metadata filters are invalid.", "Use limit 1–100, an exact kind/generated opaque ID and the returned cursor unchanged. Authored names/IDs are not metadata lookup keys. No request was sent.");
         return new URLSearchParams({ ...this.scope(), ...Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined).map(([name, value]) => [name, String(value)])) }).toString();
     }

@@ -1,4 +1,5 @@
 import { BATCH_RECEIPT_VERSION, type AssessmentState, type BatchResult, type BatchReceipt, type CiReportReceipt } from "../contracts/index.js";
+import { simulationGateCounts } from "./simulation-exit.js";
 
 export { BATCH_RECEIPT_VERSION } from "../contracts/index.js";
 export type { BatchReceipt } from "../contracts/index.js";
@@ -43,7 +44,7 @@ export function batchReceipt(result: BatchResult & { operationId?: string; ciRep
     ...(result.operationId === undefined ? {} : { operationId: result.operationId }),
     ...(result.ciReport === undefined ? {} : { ciReport: result.ciReport }),
     ...(result.lifecycle === undefined ? {} : { lifecycle: result.lifecycle }),
-    assessmentCounts, reportUrl: result.reportUrl, runSample,
+    assessmentCounts, gateCounts: simulationGateCounts(result), reportUrl: result.reportUrl, runSample,
     sample: { returned: runSample.length, total: batch.total, complete: fullCoverage && runSample.length === batch.total,
       kind: "first_retained_runs_not_a_page" },
     reads: { batch: `${path}?view=operator`, runs: `${path}/runs`, summary: `${path}/summary?view=operator` },

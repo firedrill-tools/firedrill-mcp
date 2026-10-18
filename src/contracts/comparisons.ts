@@ -49,11 +49,18 @@ export interface MeasurementStats {
   count: number; missing: number; invalid: number; median: number | null;
   range: { minimum: number; maximum: number } | null;
 }
+/** Provider-native numeric scores, kept separate from ordinal rubric levels. */
+export interface ProviderScoreStats {
+  provider: "jev"; scale: [0, 4]; ordinalConversion: "none";
+  count: number; mean: number | null; median: number | null;
+  range: { minimum: number; maximum: number } | null;
+}
 export interface DimensionSummary {
   dimensionId: string; evaluator: EvaluatorRef | null; requested: number;
   assessed: number; notAssessable: number; notApplicable: number; missing: number; invalid: number;
   levels: LevelStats;
-  samples: { run: RunRef; level: number | null; state: string; evidenceIds: string[] }[];
+  providerScores?: ProviderScoreStats;
+  samples: { run: RunRef; level: number | null; providerScore?: number | null; state: string; evidenceIds: string[] }[];
   samplesTruncated: boolean;
 }
 export interface ExactCheckSummary {
@@ -129,7 +136,10 @@ export interface PairedDimensionSummary {
   rubric: RubricRef; dimensionId: string; evaluator: EvaluatorRef;
   matchedPairs: number; assessedPairs: number; notApplicablePairs: number; missingOrNotAssessablePairs: number;
   baseline: LevelStats; candidate: LevelStats;
-  samples: { baseline: RunRef; candidate: RunRef; baselineLevel: number | null; candidateLevel: number | null }[];
+  providerScores?: { provider: "jev"; scale: [0, 4]; ordinalConversion: "none"; assessedPairs: number;
+    baseline: ProviderScoreStats; candidate: ProviderScoreStats };
+  samples: { baseline: RunRef; candidate: RunRef; baselineLevel: number | null; candidateLevel: number | null;
+    baselineProviderScore?: number | null; candidateProviderScore?: number | null }[];
   samplesTruncated: boolean;
 }
 export type CompositePairExclusion = "missing_baseline" | "missing_candidate" | "policy_not_authored_on_both"

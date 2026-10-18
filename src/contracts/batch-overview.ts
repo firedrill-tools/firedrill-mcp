@@ -9,6 +9,8 @@ export interface BatchOverview {
     state: "not_requested" | "single_dimension" | "mixed" | "unavailable";
     dimension?: { id: string; description: string; scale: [0, 4] };
     levels?: [number, number, number, number, number];
+    /** Same rubric/evaluator only. Fractional scores never become ordinal levels. */
+    providerScores?: import("./comparisons.js").ProviderScoreStats;
     coverage?: { total: number; assessed: number; notAssessable: number; notApplicable: number; pending: number; missing: number };
   };
 }

@@ -26,7 +26,8 @@ export interface ServiceDataset { schemaVersion?: "2026-10-15-dataset.1"; id: st
 export interface ServiceBuildEntry extends Omit<ServiceBuild, "manifest" | "view" | "viewDigest" | "datasetPolicy" | "publicationDigest"> { datasetConstraintCount?: number | null; metadataOnly?: boolean; service?: { id: string; version: string; operationCount: number; viewDeclared: boolean } }
 export interface ServiceDatasetEntry extends ServiceDataset { metadataOnly?: boolean }
 export interface ServiceDatasetDetail extends ServiceDataset { recordPage?: ServicePage<ServiceSeedRecord> }
-export interface ServiceInstanceListOptions { order?: "newest"; lifecycle?: "active" | "history" | "all"; cursor?: string; limit?: number }
+export type ServiceInstanceStatus = "creating" | "active" | "paused" | "recovery_required" | "expired" | "destroyed";
+export interface ServiceInstanceListOptions { order?: "newest"; lifecycle?: "active" | "history" | "all"; q?:string; status?:ServiceInstanceStatus; cursor?: string; limit?: number }
 export interface ServiceInstancePage { items: ServiceInstance[]; nextCursor: string | null; order?: "newest"; lifecycle?: "active" | "history" | "all" }
 export interface CreateServiceInput { buildId: string; datasetId?: string; seed: string; actorOperations: string[]; ttlSeconds?: number }
 export interface ServiceInstance {
@@ -39,12 +40,14 @@ export interface ServiceActionResult<T extends Json = Json> { operationId: strin
 export interface ServiceHistoryEvent { sequence: number; operationId: string | null; operationState: string | null; kind: string; payload: Json; recordedAt: string }
 export interface ServicePage<T> { items: T[]; nextCursor: number | null }
 export interface ServicePageOptions { cursor?: number; limit?: number }
-export interface ServiceObservationOptions extends ServicePageOptions { epoch?: number; evidenceCursor?: number }
+export interface ServiceBuildListOptions extends ServicePageOptions { q?:string; status?:"building"|"ready"|"failed" }
+export interface ServiceHistoryOptions extends ServicePageOptions { q?:string; kind?:string }
+export interface ServiceObservationOptions extends ServicePageOptions { epoch?: number; evidenceCursor?: number; namespace?:string; rowQ?:string; activityKind?:string; activityQ?:string; pendingQ?:string }
 export interface ServiceObservedPage<T> { items: T[]; total?: number; complete: boolean; nextCursor: number | null; digest: string }
 export interface ServiceObservation {
   schemaVersion: "2026-10-15-service-observation.1"; instanceId: string; epoch: number; observedAt: string;
   provenance: "service_attested"; virtualTimeUs: number; evidenceHead: number; lifecycle: string;
-  state: ServiceObservedPage<ServiceSeedRecord>; pendingWork: ServiceObservedPage<Json>; activity: ServiceObservedPage<Json>; digest: string;
+  namespaces?:string[]; state: ServiceObservedPage<ServiceSeedRecord>; pendingWork: ServiceObservedPage<Json>; activity: ServiceObservedPage<Json>; digest: string;
 }
 export type ServicePendingWork = Pick<ServiceObservation, "schemaVersion" | "instanceId" | "epoch" | "observedAt" | "virtualTimeUs" | "provenance"> & ServiceObservedPage<Json>;
 export interface ServiceConformanceInput {
@@ -87,7 +90,7 @@ export class ConnectionGrant {
   toJSON() { return { connection: this.connection, tokenDelivery: this.tokenDelivery, repair: this.repair }; }
 }
 type Request = <T>(method: string, path: string, body?: unknown, key?: string) => Promise<T>;
-const fail = (code: string, message: string, repair: string): never => { throw new FiredrillError(code, message, repair); };
+function fail(code: string, message: string, repair: string): never { throw new FiredrillError(code, message, repair); }
 function key(value: string): string {
   if (typeof value !== "string" || !value.trim() || value.length > 200 || /[\r\n]/.test(value)) fail("IDEMPOTENCY_REQUIRED", "This mutation needs an explicit stable key of 1–200 characters.", "Save and reuse the same key with identical input after an uncertain response. Choose a new key only for a new action.");
   return value;
@@ -95,6 +98,20 @@ function key(value: string): string {
 function integer(value: number, name: string, minimum = 0, maximum = Number.MAX_SAFE_INTEGER): number {
   if (!Number.isSafeInteger(value) || value < minimum || value > maximum) fail("SERVICE_ARGUMENT_INVALID", `${name} must be an integer between ${minimum} and ${maximum}.`, "Read the retained instance and supply exact epoch/time/page values.");
   return value;
+}
+function readFilters(values:Record<string,unknown>):string {
+  const query=new URLSearchParams();
+  for(const [name,input] of Object.entries(values)) {
+    if(input===undefined) continue;
+    const maximum=name==="namespace"?96:name==="kind"||name==="activityKind"?80:120;
+    if(typeof input!=="string" || input.length>maximum || /[\x00-\x1f\x7f]/.test(input) || (name==="kind"||name==="activityKind")&&!/^[a-zA-Z0-9_.:-]+$/.test(input)) fail("SERVICE_FILTER_INVALID",`${name} must be a bounded text filter.`,"Clear the page cursor when changing search or filters; retain the exact instance epoch while paging observation.");
+    const value=["q","rowQ","activityQ","pendingQ"].includes(name)?input.trim():input;
+    if(value) query.set(name,value);
+  }
+  return query.size?`&${query}`:"";
+}
+function readStatus(value:unknown,allowed:readonly string[]):void {
+  if(value!==undefined && (typeof value!=="string"||!allowed.includes(value))) fail("SERVICE_FILTER_INVALID","Choose a declared Tool status.",`Use ${allowed.join(", ")}; clear cursor when changing status.`);
 }
 function absoluteExpiry(value: string, name: string): void {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value)
@@ -158,10 +175,11 @@ export class FiredrillServices {
   }
   catalog(): Promise<ServiceCatalogPage> { return this.request("GET", `/v1/service-catalog${this.query()}`); }
   policy(): Promise<ServicePolicy> { return this.request("GET", `/v1/service-policy${this.query()}`); }
-  builds(options: ServicePageOptions = {}): Promise<ServicePage<ServiceBuildEntry>> { return this.request("GET", `/v1/service-builds${this.query(options)}`); }
+  /** Filters apply before pagination. Restart without cursor when filters change. */
+  builds(options: ServiceBuildListOptions = {}): Promise<ServicePage<ServiceBuildEntry>> { readStatus(options.status,["building","ready","failed"]); return this.request("GET", `/v1/service-builds${this.query(options)}${readFilters({q:options.q,status:options.status})}`); }
   build(buildId: string): Promise<ServiceBuild> { return this.request("GET", `/v1/service-builds/${id(buildId)}${this.query()}`); }
-  datasets(options: ServicePageOptions & { buildId?: string } = {}): Promise<ServicePage<ServiceDatasetEntry>> {
-    return this.request("GET", `/v1/service-datasets${this.query(options)}${options.buildId ? `&buildId=${id(options.buildId)}` : ""}`);
+  datasets(options: ServicePageOptions & { buildId?: string; q?:string } = {}): Promise<ServicePage<ServiceDatasetEntry>> {
+    return this.request("GET", `/v1/service-datasets${this.query(options)}${options.buildId ? `&buildId=${id(options.buildId)}` : ""}${readFilters({q:options.q})}`);
   }
   dataset(datasetId: string, options: ServicePageOptions & { includeRecords?: boolean } = {}): Promise<ServiceDatasetDetail> {
     if (options.includeRecords !== undefined && typeof options.includeRecords !== "boolean") fail("SERVICE_ARGUMENT_INVALID", "includeRecords must be a boolean.", "Omit it for metadata, or explicitly request a bounded records page.");
@@ -248,18 +266,19 @@ export class FiredrillServices {
     const lifecycle = options.lifecycle ?? "active";
     if (!["active", "history", "all"].includes(lifecycle)) fail("SERVICE_ARGUMENT_INVALID", "Choose active, history or all instances.", "Clear cursor when changing filters.");
     query.set("lifecycle", lifecycle);
-    if (options.cursor !== undefined) { if (typeof options.cursor !== "string" || !options.cursor || options.cursor.length > 4096) fail("SERVICE_ARGUMENT_INVALID", "Newest instance pages use their returned opaque cursor.", "Omit cursor on the first page; copy nextCursor unchanged."); query.set("cursor", options.cursor); }
+    if (options.cursor !== undefined) { if (typeof options.cursor !== "string" || !/^[A-Za-z0-9_-]{1,1024}$/.test(options.cursor)) fail("SERVICE_ARGUMENT_INVALID", "Newest instance pages use their returned opaque cursor.", "Omit cursor on the first page; copy nextCursor unchanged and clear it when changing filters."); query.set("cursor", options.cursor); }
     query.set("limit", String(integer(options.limit ?? 25, "limit", 1, 100)));
-    return this.request("GET", `/v1/service-instances?${query}`);
+    readStatus(options.status,["creating","active","paused","recovery_required","expired","destroyed"]);
+    return this.request("GET", `/v1/service-instances?${query}${readFilters({q:options.q,status:options.status})}`);
   }
-  history(instanceId: string, options: ServicePageOptions = {}): Promise<ServicePage<ServiceHistoryEvent>> { return this.request("GET", `/v1/service-instances/${id(instanceId)}/history${this.query(options)}`); }
+  history(instanceId: string, options: ServiceHistoryOptions = {}): Promise<ServicePage<ServiceHistoryEvent>> { return this.request("GET", `/v1/service-instances/${id(instanceId)}/history${this.query(options)}${readFilters({q:options.q,kind:options.kind})}`); }
   private observationQuery(options: ServiceObservationOptions): string {
     let value = this.query(options);
     if (options.epoch !== undefined) value += `&epoch=${integer(options.epoch, "epoch")}`;
     if (options.evidenceCursor !== undefined) value += `&evidenceCursor=${integer(options.evidenceCursor, "evidenceCursor")}`;
-    return value;
+    return value+readFilters({namespace:options.namespace,rowQ:options.rowQ,activityKind:options.activityKind,activityQ:options.activityQ,pendingQ:options.pendingQ});
   }
-  /** Canonical state/activity, not a target-reported observation. Retain epoch while paging. */
+  /** Canonical state/activity, not target-reported. Retain epoch; clear cursors when changing filters. */
   observe(instanceId: string, options: ServiceObservationOptions = {}): Promise<ServiceObservation> {
     return this.request("GET", `/v1/service-instances/${id(instanceId)}/observation${this.observationQuery(options)}`);
   }

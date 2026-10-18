@@ -16,6 +16,8 @@ export const InspectionFilterFields = {
     createdAfter: utcDate.optional(), createdBefore: utcDate.optional(),
     execution: z.enum(["queued", "running", "completed", "error", "interrupted", "cancelled"]).optional(),
     origin: z.enum(["cli", "sdk", "mcp", "ci", "api", "unknown"]).optional(),
+    repository: CiContextSchema.shape.repository.optional(),
+    workflowRunId: CiContextSchema.shape.runId.optional(),
     scenarioId: boundedId.optional(), configurationId: boundedId.optional(),
     issue: z.enum(["incomplete", "exact_violation", "assessment_unavailable", "below_level"]).optional(),
     dimensionId: boundedId.optional(), minimumLevel: z.preprocess(value => typeof value === "number" ? value : typeof value === "string" && /^\d$/.test(value) ? Number(value) : NaN, z.number().int().min(0).max(4)).optional(),
@@ -26,7 +28,10 @@ export const InspectionFiltersSchema = z.object(InspectionFilterFields).strict()
     if (value.issue === "below_level" ? !value.dimensionId || value.minimumLevel === undefined : value.dimensionId !== undefined || value.minimumLevel !== undefined)
         ctx.addIssue({ code: "custom", path: ["dimensionId"], message: "below_level requires dimensionId and minimumLevel; other filters must omit them." });
 });
-export const ScenarioFiltersSchema = z.object({ q: InspectionFilterFields.q }).strict();
+export const ScenarioFiltersSchema = z.object({ q: InspectionFilterFields.q,
+    evaluation: z.enum(["quality", "exact", "observation"]).optional(),
+    sequence: z.enum(["single", "sequence"]).optional(),
+}).strict();
 export const INSPECTION_FILTER_KEYS = Object.keys(InspectionFilterFields);
 /** Stable ordering is shared by URL serialization and cursor fingerprints. */
 export function inspectionFilterQuery(filters) {

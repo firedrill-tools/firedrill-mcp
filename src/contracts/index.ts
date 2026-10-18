@@ -22,6 +22,7 @@ export * from "./result-lifecycle.js";
 export * from "./batch-overview.js";
 export * from "./service-resources.js";
 export * from "./capacity.js";
+export * from "./recommendations.js";
 
 export const CONTRACT_VERSION = "2026-10-14" as const;
 export * from "./comparisons.js";
@@ -293,6 +294,8 @@ export const RecipeSchema = z.object({
     requireCompleted: z.boolean().default(true),
     requireExactChecks: z.boolean().default(true),
     minimumLevels: z.record(z.string(), z.number().int().min(0).max(4)).default({}),
+    /** Native fractional evaluator scores. Missing/unassessable scores are inconclusive, never silently rounded to levels. */
+    minimumScores: z.record(z.string(), z.number().finite().min(0).max(4)).optional(),
   }).strict().optional(),
 }).strict().superRefine((recipe, ctx) => {
   const count = recipe.scenarios.length * recipe.configurations.length * recipe.repetitions;
@@ -359,7 +362,8 @@ export interface EvaluatorAdmissionPolicy {
   maxRequestsPerBatch: number | null;
   maxConcurrentRequests: number;
   maxInputBytes: number;
-  maxOutputTokens: number;
+  /** Null when the configured provider does not expose an output-token control. */
+  maxOutputTokens: number | null;
   maxAttemptsPerAssessment: number;
 }
 export interface RecipePreview {
@@ -431,14 +435,16 @@ export interface CheckResult {
   omittedValues?: { actual?: { bytes: number; sha256: string; path: string }; expected?: { bytes: number; sha256: string; checkId: string } };
   provenance?: { kind: "service_attested"; service: string; instanceId: string; epoch: number; observationDigest: string };
 }
-export interface DimensionResult { id: string; level: number | null; state: "assessed" | "not_assessable" | "not_applicable"; explanation: string; evidenceIds: string[] }
-export interface EvaluatorConfiguration {
-  provider: "anthropic"; endpoint: "https://api.anthropic.com/v1/messages"; apiVersion: "2023-06-01";
+export interface DimensionResult { id: string; level: number | null; state: "assessed" | "not_assessable" | "not_applicable"; explanation: string; evidenceIds: string[]; providerScore?: import("./recommendations.js").JevProviderScore }
+interface EvaluatorConfigurationPolicy {
   admission?: EvaluatorAdmissionPolicy;
-  model: string; protocol: string; instructionsHash: string; maxInputBytes: number; maxEvidenceEvents: number; maxOutputTokens: number;
+  model: string; protocol: string; instructionsHash: string; maxInputBytes: number; maxEvidenceEvents: number;
   transport: { method: "POST"; redirect: "error"; timeoutMs: number; maxResponseBytes: number; retries: 0 | 2;
-    retryableStatuses?: readonly [429, 503]; maximumRetryDelayMs?: number; ambiguousResponseRetry?: false };
+    retryableStatuses?: readonly [429, 503] | readonly [429, 529]; maximumRetryDelayMs?: number; ambiguousResponseRetry?: false };
 }
+export type EvaluatorConfiguration = EvaluatorConfigurationPolicy & (
+  { provider: "anthropic"; endpoint: "https://api.anthropic.com/v1/messages"; apiVersion: "2023-06-01"; maxOutputTokens: number }
+  | { provider: "jev"; endpoint: "https://api.typesafe.ai/v1/systemone"; apiVersion?: never; maxOutputTokens: null });
 export interface Assessment { state: AssessmentState; checks: CheckResult[]; dimensions: DimensionResult[]; evaluator: { provider: string; model: string; version: string; configurationDigest?: string } | null; reason: string | null;
   /** Frozen numeric observations; absent on historical/unrequested results. Never automatic quality scores. */
   metrics?: import("./task-metrics.js").TaskMetricResult[];
@@ -473,6 +479,8 @@ export interface BatchResult {
   resultVersion?: typeof COMPACT_RESULT_VERSION;
   pagination?: { nextCursor: string | null; total: number; complete: boolean };
   assessmentCounts?: Record<AssessmentState, number>;
+  /** Authoritative whole-population gate counts, including compact responses. Absence is unknown on earlier services. */
+  gateCounts?: Record<GateState, number>;
 }
 export interface ApiError { error: { code: string; message: string; repair: string; requestId: string; details?: Json; validation?: import("./validation.js").ValidationDiagnostics } }
 export const EventInputSchema = z.object({
@@ -495,3 +503,4 @@ export const ArtifactSchema = z.object({
 }).strict();
 export type Artifact = z.infer<typeof ArtifactSchema>;
 export interface ArtifactReference extends Artifact { runId: string; attemptId: string; state: "pending" | "available"; uploadPath: string; downloadPath: string }
+export * from "./github-ci.js";

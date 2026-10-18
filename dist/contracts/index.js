@@ -22,6 +22,7 @@ export * from "./result-lifecycle.js";
 export * from "./batch-overview.js";
 export * from "./service-resources.js";
 export * from "./capacity.js";
+export * from "./recommendations.js";
 export const CONTRACT_VERSION = "2026-10-14";
 export * from "./comparisons.js";
 export * from "./credentials.js";
@@ -280,6 +281,8 @@ export const RecipeSchema = z.object({
         requireCompleted: z.boolean().default(true),
         requireExactChecks: z.boolean().default(true),
         minimumLevels: z.record(z.string(), z.number().int().min(0).max(4)).default({}),
+        /** Native fractional evaluator scores. Missing/unassessable scores are inconclusive, never silently rounded to levels. */
+        minimumScores: z.record(z.string(), z.number().finite().min(0).max(4)).optional(),
     }).strict().optional(),
 }).strict().superRefine((recipe, ctx) => {
     const count = recipe.scenarios.length * recipe.configurations.length * recipe.repetitions;
@@ -371,3 +374,4 @@ export const ArtifactSchema = z.object({
     bytes: z.number().int().min(1).max(16 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/),
     capturedAt: z.string().datetime(), metadata: z.record(z.string(), JsonSchema).default({}),
 }).strict();
+export * from "./github-ci.js";

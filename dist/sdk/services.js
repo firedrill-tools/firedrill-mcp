@@ -15,7 +15,7 @@ export class ConnectionGrant {
     revealLaunchUrl() { return this.#launchUrl; }
     toJSON() { return { connection: this.connection, tokenDelivery: this.tokenDelivery, repair: this.repair }; }
 }
-const fail = (code, message, repair) => { throw new FiredrillError(code, message, repair); };
+function fail(code, message, repair) { throw new FiredrillError(code, message, repair); }
 function key(value) {
     if (typeof value !== "string" || !value.trim() || value.length > 200 || /[\r\n]/.test(value))
         fail("IDEMPOTENCY_REQUIRED", "This mutation needs an explicit stable key of 1–200 characters.", "Save and reuse the same key with identical input after an uncertain response. Choose a new key only for a new action.");
@@ -25,6 +25,24 @@ function integer(value, name, minimum = 0, maximum = Number.MAX_SAFE_INTEGER) {
     if (!Number.isSafeInteger(value) || value < minimum || value > maximum)
         fail("SERVICE_ARGUMENT_INVALID", `${name} must be an integer between ${minimum} and ${maximum}.`, "Read the retained instance and supply exact epoch/time/page values.");
     return value;
+}
+function readFilters(values) {
+    const query = new URLSearchParams();
+    for (const [name, input] of Object.entries(values)) {
+        if (input === undefined)
+            continue;
+        const maximum = name === "namespace" ? 96 : name === "kind" || name === "activityKind" ? 80 : 120;
+        if (typeof input !== "string" || input.length > maximum || /[\x00-\x1f\x7f]/.test(input) || (name === "kind" || name === "activityKind") && !/^[a-zA-Z0-9_.:-]+$/.test(input))
+            fail("SERVICE_FILTER_INVALID", `${name} must be a bounded text filter.`, "Clear the page cursor when changing search or filters; retain the exact instance epoch while paging observation.");
+        const value = ["q", "rowQ", "activityQ", "pendingQ"].includes(name) ? input.trim() : input;
+        if (value)
+            query.set(name, value);
+    }
+    return query.size ? `&${query}` : "";
+}
+function readStatus(value, allowed) {
+    if (value !== undefined && (typeof value !== "string" || !allowed.includes(value)))
+        fail("SERVICE_FILTER_INVALID", "Choose a declared Tool status.", `Use ${allowed.join(", ")}; clear cursor when changing status.`);
 }
 function absoluteExpiry(value, name) {
     if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value)
@@ -112,10 +130,11 @@ export class FiredrillServices {
     }
     catalog() { return this.request("GET", `/v1/service-catalog${this.query()}`); }
     policy() { return this.request("GET", `/v1/service-policy${this.query()}`); }
-    builds(options = {}) { return this.request("GET", `/v1/service-builds${this.query(options)}`); }
+    /** Filters apply before pagination. Restart without cursor when filters change. */
+    builds(options = {}) { readStatus(options.status, ["building", "ready", "failed"]); return this.request("GET", `/v1/service-builds${this.query(options)}${readFilters({ q: options.q, status: options.status })}`); }
     build(buildId) { return this.request("GET", `/v1/service-builds/${id(buildId)}${this.query()}`); }
     datasets(options = {}) {
-        return this.request("GET", `/v1/service-datasets${this.query(options)}${options.buildId ? `&buildId=${id(options.buildId)}` : ""}`);
+        return this.request("GET", `/v1/service-datasets${this.query(options)}${options.buildId ? `&buildId=${id(options.buildId)}` : ""}${readFilters({ q: options.q })}`);
     }
     dataset(datasetId, options = {}) {
         if (options.includeRecords !== undefined && typeof options.includeRecords !== "boolean")
@@ -239,23 +258,24 @@ export class FiredrillServices {
             fail("SERVICE_ARGUMENT_INVALID", "Choose active, history or all instances.", "Clear cursor when changing filters.");
         query.set("lifecycle", lifecycle);
         if (options.cursor !== undefined) {
-            if (typeof options.cursor !== "string" || !options.cursor || options.cursor.length > 4096)
-                fail("SERVICE_ARGUMENT_INVALID", "Newest instance pages use their returned opaque cursor.", "Omit cursor on the first page; copy nextCursor unchanged.");
+            if (typeof options.cursor !== "string" || !/^[A-Za-z0-9_-]{1,1024}$/.test(options.cursor))
+                fail("SERVICE_ARGUMENT_INVALID", "Newest instance pages use their returned opaque cursor.", "Omit cursor on the first page; copy nextCursor unchanged and clear it when changing filters.");
             query.set("cursor", options.cursor);
         }
         query.set("limit", String(integer(options.limit ?? 25, "limit", 1, 100)));
-        return this.request("GET", `/v1/service-instances?${query}`);
+        readStatus(options.status, ["creating", "active", "paused", "recovery_required", "expired", "destroyed"]);
+        return this.request("GET", `/v1/service-instances?${query}${readFilters({ q: options.q, status: options.status })}`);
     }
-    history(instanceId, options = {}) { return this.request("GET", `/v1/service-instances/${id(instanceId)}/history${this.query(options)}`); }
+    history(instanceId, options = {}) { return this.request("GET", `/v1/service-instances/${id(instanceId)}/history${this.query(options)}${readFilters({ q: options.q, kind: options.kind })}`); }
     observationQuery(options) {
         let value = this.query(options);
         if (options.epoch !== undefined)
             value += `&epoch=${integer(options.epoch, "epoch")}`;
         if (options.evidenceCursor !== undefined)
             value += `&evidenceCursor=${integer(options.evidenceCursor, "evidenceCursor")}`;
-        return value;
+        return value + readFilters({ namespace: options.namespace, rowQ: options.rowQ, activityKind: options.activityKind, activityQ: options.activityQ, pendingQ: options.pendingQ });
     }
-    /** Canonical state/activity, not a target-reported observation. Retain epoch while paging. */
+    /** Canonical state/activity, not target-reported. Retain epoch; clear cursors when changing filters. */
     observe(instanceId, options = {}) {
         return this.request("GET", `/v1/service-instances/${id(instanceId)}/observation${this.observationQuery(options)}`);
     }

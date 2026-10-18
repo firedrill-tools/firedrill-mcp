@@ -11,6 +11,8 @@ export interface BatchReceipt {
   /** Optional local summary-delivery fact, separate from retained execution. */
   ciReport?: CiReportReceipt;
   assessmentCounts: Record<AssessmentState, number> | null;
+  /** Whole-population CI policy counts. Missing/null is unknown, not a sampled count. */
+  gateCounts?: Record<GateState, number> | null;
   lifecycle?: import("./result-lifecycle.js").ResultLifecycle;
   reportUrl: string;
   runSample: Array<Pick<Run, "id" | "repetition" | "execution" | "assessment" | "gate"> & {

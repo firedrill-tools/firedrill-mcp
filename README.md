@@ -15,7 +15,7 @@ alone never launches code on a laptop.
 Use Node 22 or newer. From your application repository:
 
 ```sh
-npm install --save-dev --save-exact --ignore-scripts @firedrill-run/mcp@2.0.0
+npm install --save-dev --save-exact --ignore-scripts @firedrill-run/mcp@2.1.0
 ```
 
 The CLI package also includes the same `firedrill-mcp` binary: install one owner

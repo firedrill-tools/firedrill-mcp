@@ -28,10 +28,14 @@ import { retainedValuePath, operatorReportPath, operatorBatchPath } from "./reta
 import { authoringSchemaPath, requireDiscoveryVersion } from "./discovery.js";
 import { newSubmission, matchRetainedSubmission } from "./ci-context.js";
 import { writeCiReport } from "./ci-report.js";
+export { writeCiReport } from "./ci-report.js";
+import { writeCiResultReceipt } from "./ci-result-receipt.js";
+export { simulationExitCode } from "./simulation-exit.js";
 import { activityReportQuery, confirmActivitySelection } from "./activity.js";
 import { followBatch } from "./follow.js";
 import { submitBatch, resumeBatchSubmission } from "./submission.js";
 import { isScopedResourceRead, readScopeHeaders, readScopeConfirmed, RESULT_LIFECYCLE_VERSION } from "../contracts/index.js";
+import { ScenarioRecommendationRequestSchema, ScenarioRecommendationSchema } from "../contracts/index.js";
 function checkedInspectionFilters(value) {
     const parsed = InspectionFiltersSchema.safeParse(value);
     if (!parsed.success)
@@ -40,6 +44,7 @@ function checkedInspectionFilters(value) {
 }
 export { SERVICE_BUILD_DIAGNOSTICS_VERSION, readServiceBuildFailure } from "./service-build-diagnostics.js";
 export { CI_CONTEXT_VERSION, CI_REPORT_VERSION } from "../contracts/index.js";
+export { GITHUB_CI_VERSION } from "../contracts/index.js";
 export { ACTIVITY_VERSION } from "../contracts/index.js";
 export { FOLLOW_VERSION, followBatch } from "./follow.js";
 export { SUBMISSION_RECEIPT_VERSION, SubmissionError } from "./submission.js";
@@ -69,6 +74,7 @@ export { TASK_METRIC_VERSION, TaskMetricDefinitionSchema } from "../contracts/in
 export { COMPOSITE_VERSION } from "../contracts/index.js";
 export { POPULATION_PURPOSE_VERSION, POPULATION_DISCLOSURE_VERSION, PopulationPurposeSchema } from "../contracts/index.js";
 export { ASSESSMENT_POLICY_VERSION, SERVICE_CONTROL_VERSION, SERVICE_CONTROL_CLOCK_VERSION } from "../contracts/index.js";
+export { RECOMMENDATION_VERSION } from "../contracts/index.js";
 function simulationResult(result, operationId, ci) {
     const ciReport = writeCiReport(result, ci);
     return { ...result, operationId, ...(ciReport ? { ciReport } : {}) };
@@ -137,7 +143,7 @@ export class Firedrill {
         let observedStatus;
         const readOnly = method === "GET" || method === "POST" && ["/v1/recipes/preview", "/v1/recipes/materialize", "/v1/comparisons"].includes(path.split("?")[0]);
         try {
-            const selectedRead = isScopedResourceRead(method, path) ? readScope ?? this.scope() : undefined;
+            const selectedRead = isScopedResourceRead(method, path) || method === "POST" && path === "/v1/ci/github/reports" ? readScope ?? this.scope() : undefined;
             const token = await this.authToken();
             const response = await fetch(`${this.apiUrl}${path}`, { method, headers: { authorization: `Bearer ${token}`, accept: "application/json", ...(selectedRead ? readScopeHeaders(selectedRead) : {}), ...(body === undefined ? {} : { "content-type": "application/json" }), ...(key ? { "Idempotency-Key": key } : {}) }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(this.options.requestTimeoutMs ?? 30000), redirect: "error" });
             observedStatus = response.status;
@@ -307,6 +313,26 @@ export class Firedrill {
     listProjects() { return this.request("GET", "/v1/projects"); }
     createProject(name, idempotencyKey = randomUUID()) { return this.request("POST", "/v1/projects", { name }, idempotencyKey); }
     status(batchId) { return this.request("GET", `/v1/batches/${id(batchId)}`); }
+    /** Publish only through the service's verified GitHub App connection. The
+     * workflow identity token is never a customer-target credential. */
+    reportGithub(batchId, oidcToken, idempotencyKey) {
+        if (!/^[A-Za-z0-9_-]{1,160}$/.test(batchId) || typeof oidcToken !== "string" || oidcToken.length < 100 || oidcToken.length > 16384 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(oidcToken) ||
+            typeof idempotencyKey !== "string" || !/^[\x21-\x7e]{1,200}$/.test(idempotencyKey))
+            throw new FiredrillError("CI_REPORT_INVALID", "GitHub reporting needs an exact retained batch and workflow identity.", "Use firedrill ci report inside the selected GitHub Actions job. No simulation is started by reporting.");
+        return this.request("POST", "/v1/ci/github/reports", { batchId, oidcToken }, idempotencyKey, this.scope());
+    }
+    githubConnections(options = {}) {
+        if (options.cursor !== undefined && !/^[A-Za-z0-9_-]{1,400}$/.test(options.cursor) || options.limit !== undefined &&
+            (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 100))
+            throw new FiredrillError("CI_CONNECTION_PAGE_INVALID", "Use the returned connection cursor and a page size of 1–100.", "Keep the same selected project/environment when following a page cursor.");
+        return this.request("GET", `/v1/ci/github/connections?${new URLSearchParams({ ...this.scope(),
+            ...(options.cursor ? { cursor: options.cursor } : {}), ...(options.limit === undefined ? {} : { limit: String(options.limit) }) })}`);
+    }
+    githubReport(batchId) {
+        if (!/^[A-Za-z0-9_-]{1,160}$/.test(batchId))
+            throw new FiredrillError("CI_BATCH_INVALID", "Select an exact retained batch ID.", "Use the admitted simulation batch; this read never publishes or reruns it.");
+        return this.request("GET", `/v1/batches/${id(batchId)}/github-report`);
+    }
     /** Observe retained work only; does not claim, cancel, assess or write CI summaries. */
     follow(batchId, options = {}) {
         const scope = this.scope();
@@ -374,11 +400,12 @@ export class Firedrill {
             query.set("cursor", options.cursor);
         if (options.limit !== undefined)
             query.set("limit", String(options.limit));
-        const filters = ScenarioFiltersSchema.safeParse({ ...(options.q === undefined ? {} : { q: options.q }) });
+        const filters = ScenarioFiltersSchema.safeParse({ q: options.q, evaluation: options.evaluation, sequence: options.sequence });
         if (!filters.success)
-            throw definitionError("FILTER_INVALID", "Scenario prefix is invalid.", "Use a literal name/ID prefix of 1–100 characters. No request was sent.", filters.error.issues);
-        if (filters.data.q)
-            query.set("q", filters.data.q);
+            throw definitionError("FILTER_INVALID", "Scenario filters are invalid.", "Use a literal name/ID prefix, evaluation quality|exact|observation, or sequence single|sequence. No request was sent.", filters.error.issues);
+        for (const [key, value] of Object.entries(filters.data))
+            if (value !== undefined)
+                query.set(key, value);
         return this.request("GET", `/v1/scenarios?${query}`);
     }
     scenario(scenarioId, revision, options = {}) {
@@ -387,6 +414,47 @@ export class Firedrill {
             throw new FiredrillError("SCOPE_REQUIRED", "Scenario definitions require a selected project.", "Pass projectId and the exact immutable revision from listScenarios.");
         const environmentId = options.environmentId ?? (projectId === this.projectId ? this.environmentId : undefined);
         return this.request("GET", `/v1/scenarios/definition?${new URLSearchParams({ projectId, scenarioId, revision, ...(environmentId !== undefined ? { environmentId } : {}) })}`);
+    }
+    /** Rank caller-authored candidates. Does not execute, save or rewrite scenarios. */
+    async recommendScenarios(input, options) {
+        const key = options?.idempotencyKey;
+        if (typeof key !== "string" || !/^[\x21-\x7e]{1,200}$/.test(key))
+            throw new FiredrillError("IDEMPOTENCY_REQUIRED", "Scenario recommendation requires an explicit saved operation key.", "Keep the same key and candidates/criteria for recovery. Read recoverScenarioRecommendation(key) after an uncertain response.");
+        const scope = this.scope();
+        const parsed = ScenarioRecommendationRequestSchema.safeParse({ ...input, ...scope });
+        if (!parsed.success)
+            throw definitionError("RECOMMENDATION_INVALID", "Scenario recommendation input is invalid.", "Supply authored candidate scenarios and criteria with five ordered level anchors (0–4). No recommendation request was sent.", parsed.error.issues);
+        try {
+            return this.confirmScenarioRecommendation(await this.request("POST", "/v1/scenario-recommendations", parsed.data, key), scope);
+        }
+        catch (error) {
+            if (error instanceof FiredrillError && error.details.uncertain)
+                throw new FiredrillError(error.code, "The scenario recommendation response was not confirmed.", "Read recoverScenarioRecommendation with the original key and scope. Pending reads do not resend provider requests. Never use a new key to recover this request.", error.details);
+            throw error;
+        }
+    }
+    /** Read the durable recommendation without invoking its provider again. */
+    async getScenarioRecommendation(recommendationId) {
+        if (typeof recommendationId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(recommendationId))
+            throw new FiredrillError("RECOMMENDATION_ID_INVALID", "Select an exact recommendation ID.", "Use the ID from the original saved response.");
+        const scope = this.scope();
+        const value = this.confirmScenarioRecommendation(await this.request("GET", `/v1/scenario-recommendations/${id(recommendationId)}?${new URLSearchParams(scope)}`), scope);
+        if (value.id !== recommendationId)
+            throw new FiredrillError("RECOMMENDATION_SCOPE_UNCONFIRMED", "The recommendation response did not confirm the requested ID.", "Read the exact original ID with aligned service/client versions. No provider was invoked by this read.", { uncertain: false, workStarted: false, retry: "same_request", category: "infrastructure" });
+        return value;
+    }
+    /** Resolve the original key only; never repeats evaluation or target execution. */
+    async recoverScenarioRecommendation(operationKey) {
+        if (typeof operationKey !== "string" || !/^[\x21-\x7e]{1,200}$/.test(operationKey))
+            throw new FiredrillError("IDEMPOTENCY_REQUIRED", "Use the original recommendation operation key.", "Reuse its selected project/environment and authorized identity.");
+        const scope = this.scope();
+        return this.confirmScenarioRecommendation(await this.request("GET", `/v1/scenario-recommendations/by-key?${new URLSearchParams({ ...scope, key: operationKey })}`), scope);
+    }
+    confirmScenarioRecommendation(value, scope) {
+        const parsed = ScenarioRecommendationSchema.safeParse(value);
+        if (!parsed.success || parsed.data.projectId !== scope.projectId || parsed.data.environmentId !== scope.environmentId)
+            throw new FiredrillError("RECOMMENDATION_SCOPE_UNCONFIRMED", "The service did not confirm a valid recommendation in the selected project/environment.", "Read the original key and scope with aligned service/client versions. No unconfirmed recommendation is returned.", { uncertain: false, workStarted: "unknown", retry: "reconcile", category: "infrastructure" });
+        return parsed.data;
     }
     /** Authenticated, nonallocating estimate. Never calls the supplied target. */
     async preview(input) {
@@ -721,6 +789,7 @@ export class Firedrill {
                     cancel();
             }
             const batchId = journal.batchId;
+            writeCiResultReceipt({ id: batchId, ...scope });
             const pinIsolated = (work, path, claim, step) => {
                 work.isolatedReceipt = { path, input: claim.run.scenario.input, timeoutMs: claim.limits.timeoutMs, maxOutputBytes: claim.limits.maxOutputBytes, ...(step ? { step } : {}) };
                 save(); // Awaited by the adapter before any child or resource is started.

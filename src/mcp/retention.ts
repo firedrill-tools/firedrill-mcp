@@ -17,7 +17,7 @@ export function registerRetentionTools(server: McpServer, options: { principal: 
   };
   const inspection = [
     z.object({ action: z.literal("policy"), ...scope }).strict(),
-    z.object({ action: z.literal("metadata"), ...scope, cursor: z.string().regex(/^ret_[a-f0-9]{24}$/).optional(), limit: z.number().int().min(1).max(100).default(25), kind: z.enum(["batch", "run", "scenario", "build", "dataset", "instance", "artifact"]).optional(), id: z.string().regex(/^(ret|batch|run|sbuild|dataset|instance)_[a-f0-9]{24}$/).optional() }).strict(),
+    z.object({ action: z.literal("metadata"), ...scope, cursor: z.string().regex(/^ret_[a-f0-9]{24}$/).optional(), limit: z.number().int().min(1).max(100).default(25), kind: z.enum(["batch", "run", "scenario", "build", "dataset", "instance", "artifact", "recommendation"]).optional(), id: z.string().regex(/^(ret|batch|run|sbuild|dataset|instance|recommendation)_[a-f0-9]{24}$/).optional() }).strict(),
     z.object({ action: z.literal("receipt"), ...scope, removalId: z.string().regex(/^removal_[a-f0-9]{24}$/) }).strict(),
   ] as const;
   const actions = options.principal.capabilities.includes("data:delete") ? [...inspection,

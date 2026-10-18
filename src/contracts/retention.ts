@@ -14,6 +14,7 @@ export const RetentionResourceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("dataset"), id: opaque }).strict(),
   z.object({ kind: z.literal("instance"), id: opaque }).strict(),
   z.object({ kind: z.literal("artifact"), id: opaque, runId: opaque }).strict(),
+  z.object({ kind: z.literal("recommendation"), id: z.string().regex(/^recommendation_[a-f0-9]{24}$/) }).strict(),
 ]);
 export type RetentionResource = z.infer<typeof RetentionResourceSchema>;
 export const RemovalPreviewSchema = Scope.extend({ schemaVersion: z.literal(RETENTION_VERSION), targets: z.array(RetentionResourceSchema).min(1).max(1000) }).strict();
