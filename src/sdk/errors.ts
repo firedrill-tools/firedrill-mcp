@@ -1,4 +1,4 @@
-import { validationDiagnostics, validationMessage, type SchemaIssue, type BatchLifecycleRead } from "../contracts/index.js";
+import { validationDiagnostics, validationMessage, readCapacityRequestAction, type CapacityRequestAction, type SchemaIssue, type BatchLifecycleRead } from "../contracts/index.js";
 import type { ServiceBuildFailure } from "./service-build-diagnostics.js";
 
 export const CLIENT_DIAGNOSTICS_VERSION = "2026-10-17-client-diagnostics.1" as const;
@@ -47,6 +47,7 @@ export interface ClientErrorDetails {
   causeCode?: string; phase?: "declaration" | "upload"; buildId?: string; failure?: ServiceBuildFailure;
   /** Separately authorized metadata read; never a fabricated payload/result. */
   retainedLifecycle?: BatchLifecycleRead;
+  capacityRequest?: CapacityRequestAction;
 }
 export class FiredrillError extends Error {
   constructor(
@@ -59,6 +60,10 @@ export class FiredrillError extends Error {
     if (this.details.status !== undefined && (!Number.isSafeInteger(this.details.status) || this.details.status < 100 || this.details.status > 599)) delete this.details.status;
     if (this.details.causeCode !== undefined && (typeof this.details.causeCode !== "string" || !/^[A-Za-z][A-Za-z0-9_]{0,79}$/.test(this.details.causeCode))) delete this.details.causeCode;
     if (this.details.phase !== undefined && !["declaration", "upload"].includes(this.details.phase)) delete this.details.phase;
+    if (this.details.capacityRequest !== undefined) {
+      const action = readCapacityRequestAction(this.details);
+      if (action) this.details.capacityRequest = action; else delete this.details.capacityRequest;
+    }
   }
   toJSON() {
     const uncertain = this.details.uncertain ?? /UNCERTAIN|UNCONFIRMED|RECOVERY_REQUIRED|REFRESH_PENDING/i.test(this.code);

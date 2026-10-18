@@ -21,6 +21,7 @@ export * from "./task-metrics.js";
 export * from "./result-lifecycle.js";
 export * from "./batch-overview.js";
 export * from "./service-resources.js";
+export * from "./capacity.js";
 
 export const CONTRACT_VERSION = "2026-10-14" as const;
 export * from "./comparisons.js";
@@ -206,12 +207,12 @@ export const SequenceStepSchema = z.discriminatedUnion("kind", [
   z.object({ ...StepBase, kind: z.literal("target"), input: JsonSchema.optional() }).strict(),
   z.object({ ...StepBase, kind: z.literal("service"), service: ServiceAlias, operationId: Id, arguments: z.record(z.string(), JsonSchema) }).strict(),
   z.object({ ...StepBase, kind: z.literal("wait_for"), service: ServiceAlias, operationId: Id, arguments: z.record(z.string(), JsonSchema),
-    until: PredicateSchema, maxAttempts: z.number().int().min(1).max(100), intervalMs: z.number().int().min(100).max(60000) }).strict(),
+    until: PredicateSchema, maxAttempts: z.number().int().min(1).max(100000), intervalMs: z.number().int().min(100).max(60000) }).strict(),
   z.object({ ...StepBase, kind: z.literal("advance_time"), service: ServiceAlias, toUs: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), maxEvents: z.number().int().min(1).max(1000).default(100) }).strict(),
   z.object({ ...StepBase, kind: z.literal("snapshot"), service: ServiceAlias }).strict(),
   z.object({ ...StepBase, kind: z.literal("restore"), service: ServiceAlias, snapshotStepId: Id, boundary: z.literal("service_only") }).strict(),
 ]);
-export const SequenceSchema = z.object({ schemaVersion: z.literal(SEQUENCE_VERSION), steps: z.array(SequenceStepSchema).min(1).max(64) }).strict().superRefine((sequence, ctx) => {
+export const SequenceSchema = z.object({ schemaVersion: z.literal(SEQUENCE_VERSION), steps: z.array(SequenceStepSchema).min(1).max(10000) }).strict().superRefine((sequence, ctx) => {
   const previous = new Map<string, z.infer<typeof SequenceStepSchema>>();
   for (const [index, step] of sequence.steps.entries()) {
     if (step.when) comparatorIssues(step.when, ctx, ["steps", index, "when"]);
@@ -258,7 +259,7 @@ export const TargetInvocationSchema = z.object({
   configuration: ConfigurationSchema,
   runId: Id, attemptId: Id,
   tools: z.record(z.string(), JsonSchema),
-  step: z.object({ id: Id, ordinal: z.number().int().min(0).max(63) }).strict().optional(),
+  step: z.object({ id: Id, ordinal: z.number().int().min(0).max(9999) }).strict().optional(),
 }).strict();
 export type TargetInvocation = z.infer<typeof TargetInvocationSchema>;
 export const POPULATION_VERSION = "2026-10-15-population.1" as const;
@@ -283,7 +284,7 @@ export const RecipeSchema = z.object({
   repetitions: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).default(1),
   concurrency: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).default(1),
   limits: z.object({
-    timeoutMs: z.number().int().min(100).max(86400000).default(60000),
+    timeoutMs: z.number().int().min(100).max(30 * 86400000).default(60000),
     /** Optional caller execution budget, never a product allowance. */
     maxRuns: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).nullable().default(null),
     maxOutputBytes: z.number().int().min(1024).max(8388608).default(1048576),
@@ -332,7 +333,7 @@ export type Scenario = z.infer<typeof ScenarioSchema>;
 export type Configuration = z.infer<typeof ConfigurationSchema>;
 export const PopulationMaterializeSchema = ScopeSchema.extend({
   schemaVersion: z.literal(POPULATION_VERSION), recipe: RecipeSchema,
-  axes: z.array(z.object({ path: z.string().min(1).max(1000).startsWith("/"), values: z.array(JsonSchema).min(1).max(1000) }).strict()).min(1).max(8),
+  axes: z.array(z.object({ path: z.string().min(1).max(1000).startsWith("/"), values: z.array(JsonSchema).min(1) }).strict()).min(1),
   selection: z.discriminatedUnion("method", [
     z.object({ method: z.literal("matrix"), seed: z.string().min(1).max(200) }).strict(),
     z.object({ method: z.literal("sample"), seed: z.string().min(1).max(200), count: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER) }).strict(),
@@ -409,7 +410,7 @@ export interface Batch {
 }
 export interface ClaimedRun { run: Run; attemptId: string; leaseToken: string; leaseExpiresAt: string; limits: Recipe["limits"] }
 export const SequenceCompletionSchema = z.object({
-  ordinal: z.number().int().min(0).max(63), execution: z.enum(["completed", "error", "interrupted", "cancelled"]),
+  ordinal: z.number().int().min(0).max(9999), execution: z.enum(["completed", "error", "interrupted", "cancelled"]),
   output: JsonSchema, reason: z.string().max(4000).nullable(), metrics: z.record(z.string(), JsonSchema),
 }).strict();
 export type SequenceCompletion = z.infer<typeof SequenceCompletionSchema>;

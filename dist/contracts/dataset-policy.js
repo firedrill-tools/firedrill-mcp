@@ -12,8 +12,8 @@ export const DatasetConstraintSchema = z.discriminatedUnion("kind", [
     z.object({ id, kind: z.literal("unique"), namespace, pointers: z.array(DatasetPointerSchema).min(1).max(8) }).strict(),
     z.object({ id, kind: z.literal("reference"), namespace, pointer: DatasetPointerSchema,
         targetNamespace: namespace, targetPointer: DatasetPointerSchema.optional(), optional: z.boolean().optional() }).strict(),
-    z.object({ id, kind: z.literal("count"), namespace, min: z.number().int().min(0).max(10000).optional(),
-        max: z.number().int().min(0).max(10000).optional() }).strict().refine(value => (value.min !== undefined || value.max !== undefined) && (value.min === undefined || value.max === undefined || value.min <= value.max), "Declare an ordered minimum and/or maximum count."),
+    z.object({ id, kind: z.literal("count"), namespace, min: z.number().int().min(0).max(100000).optional(),
+        max: z.number().int().min(0).max(100000).optional() }).strict().refine(value => (value.min !== undefined || value.max !== undefined) && (value.min === undefined || value.max === undefined || value.min <= value.max), "Declare an ordered minimum and/or maximum count."),
 ]);
 export const DatasetPolicySchema = z.object({ schemaVersion: z.literal(DATASET_POLICY_VERSION),
     constraints: z.array(DatasetConstraintSchema).min(1).max(64) }).strict().refine(value => new Set(value.constraints.map(item => item.id)).size === value.constraints.length, "Constraint IDs must be unique.");

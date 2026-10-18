@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { DatasetPolicySchema, DatasetMetadataSchema, JsonSchema, ScopeSchema } from "../contracts/index.js";
+import { DatasetPolicySchema, DatasetMetadataSchema, JsonSchema, ScopeSchema, readCapacityRequestAction } from "../contracts/index.js";
 import { FiredrillError, FiredrillServices, executeToolStart, validateToolStartPlan, readServiceBuildFailure, FIREDRILL_API_ORIGIN } from "../sdk/index.js";
 // Transport declarations only. The service validates the authoritative manifest,
 // source capabilities, state schemas and lifecycle; no private engine is imported.
@@ -59,7 +59,9 @@ function compactAcquisition(value) {
 /** Preserve real startup observations; large replies disclose omitted identities
  * and the unchanged customer-retained intent rather than discard all success. */
 function compactToolStart(value, plan, apiUrl) {
+    const capacityRequest = value.items.map(item => readCapacityRequestAction(item.error)).find(action => action !== undefined);
     const projected = { ...value, projection: "2026-10-16-tool-start-operator.1",
+        ...(capacityRequest ? { capacityRequest } : {}),
         items: value.items.map(item => ({ alias: item.alias, phase: item.phase,
             ...(item.acquisitionId ? { acquisitionId: item.acquisitionId } : {}),
             ...(item.buildId ? { buildId: item.buildId } : {}), ...(item.datasetId ? { datasetId: item.datasetId } : {}),
@@ -73,6 +75,7 @@ function compactToolStart(value, plan, apiUrl) {
                                 projectId: value.projectId, environmentId: value.environmentId, instanceId: item.instance.id } } } } } : {}),
             ...(item.access && item.phase === "ready" && item.instanceObservation?.state === "confirmed" ? { access: item.access } : {}),
             ...(item.error ? { error: { code: item.error.code, message: bounded(item.error.message, 512), repair: bounded(item.error.repair, 2048),
+                    ...(readCapacityRequestAction(item.error) ? { capacityRequest: readCapacityRequestAction(item.error) } : {}),
                     ...(item.error.buildId ? { buildId: item.error.buildId } : {}), ...(item.error.failure ? { failure: readServiceBuildFailure(item.error.failure) } : {}) } } : {}),
         })),
         representation: { completeInstancesIncluded: false,
@@ -89,6 +92,7 @@ function compactToolStart(value, plan, apiUrl) {
         ...(item.datasetId ? { datasetId: item.datasetId } : {}), ...(item.acquisitionId ? { acquisitionId: item.acquisitionId } : {}),
         ...(item.instanceObservation ? { instanceObservation: item.instanceObservation } : {}), ...(item.error ? { errorCode: item.error.code } : {}) }));
     const summary = { schemaVersion: value.schemaVersion, projection: "2026-10-18-tool-start-operator.2", projectId: value.projectId, environmentId: value.environmentId,
+        ...(capacityRequest ? { capacityRequest } : {}),
         operationKey: value.operationKey, status: value.status, targetStarted: false, policy: bounded(value.policy, 8192),
         phaseCounts: value.items.reduce((counts, item) => { counts[item.phase] = (counts[item.phase] ?? 0) + 1; return counts; }, {}),
         items: [], representation: { completeInstancesIncluded: false, allSetupItemsIncluded: false, totalItems: identities.length, shownItems: 0, omittedItems: identities.length,
@@ -98,7 +102,7 @@ function compactToolStart(value, plan, apiUrl) {
         continuation: apiUrl !== FIREDRILL_API_ORIGIN ? { kind: "private_environment", note: "Use this environment's separately built maintainer client and original plan/key. Do not replay these IDs or credentials in the production client." } : { kind: "native_original_intent", replace: ["ORIGINAL_PLAN.json"],
             argv: ["firedrill", "tools", "start", "ORIGINAL_PLAN.json", "--idempotency-key", value.operationKey, "--project", value.projectId, "--environment", value.environmentId, "--json", "--non-interactive"],
             sdk: { typescript: "client.services.start(originalPlan, { operationKey: savedKey })", python: "client.services.start(original_plan, operation_key=saved_key)" },
-            note: "Use the original unchanged plan/key and authorized identity/scope. Native reconciliation reuses exact service receipts and may finish pending allocations in that original intent; it is not read-only and never starts a target or invents replacement instances. CLI plan files have a 256 KiB input bound; use a native SDK for larger retained plans. No remote customer-machine journal or single group-read endpoint is implied." },
+            note: "Use the original unchanged plan/key and authorized identity/scope. Native reconciliation reuses exact service receipts and may finish pending allocations in that original intent; it is not read-only and never starts a target or invents replacement instances. CLI and native SDK plans have a 4 MiB serialized input bound. No remote customer-machine journal or single group-read endpoint is implied." },
         readShownInstance: { tool: "firedrill_service_read", replace: ["INSTANCE_ID_FROM_SHOWN_ITEM"], arguments: { request: { action: "instance", projectId: value.projectId, environmentId: value.environmentId, instanceId: "INSTANCE_ID_FROM_SHOWN_ITEM" } } }, };
     for (const item of identities) {
         summary.items.push(item);
@@ -198,7 +202,7 @@ export function registerServiceTools(server, options) {
             inputSchema: ScopeSchema.extend({ operationKey: key, waitTimeoutMs: z.number().int().min(0).max(300000).default(30000), plan: z.object({ schemaVersion: z.literal("2026-10-15-tool-start.1").optional(), tools: z.array(z.object({
                         alias: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/), source: z.discriminatedUnion("kind", [z.object({ kind: z.literal("catalog"), catalogId, releaseDigest }).strict(), z.object({ kind: z.literal("build"), buildId: id }).strict()]),
                         data: z.discriminatedUnion("kind", [z.object({ kind: z.literal("empty") }).strict(), z.object({ kind: z.literal("starter") }).strict(), z.object({ kind: z.literal("saved"), datasetId: id }).strict()]),
-                        operations: z.array(operationId).min(1).max(256), seed: z.string().regex(/^(0|[1-9][0-9]*)$/).max(80).optional(), ttlSeconds: z.number().int().min(1).max(604800).optional(),
+                        operations: z.array(operationId).min(1).max(256), seed: z.string().regex(/^(0|[1-9][0-9]*)$/).max(80).optional(), ttlSeconds: z.number().int().min(1).max(2592000).optional(),
                     }).strict()).min(1) }).strict() }).strict(), annotations: write,
         }, ({ projectId, environmentId, plan, operationKey, waitTimeoutMs }) => safe(async () => {
             const normalized = validateToolStartPlan(plan);
@@ -254,7 +258,7 @@ export function registerServiceTools(server, options) {
     if (principal.capabilities.includes("services:create"))
         server.registerTool("firedrill_service_create", {
             description: "Allocate one manual service instance from an exact immutable build and optional dataset, explicit seed and actor operations. This consumes bounded service capacity, not a payment. No sample data/actor is inferred. For independent recipe cases bind services in the recipe instead; the runner allocates isolated run-owned instances.",
-            inputSchema: ScopeSchema.extend({ buildId: id, datasetId: id.optional(), seed: z.string().regex(/^(0|[1-9][0-9]*)$/).max(80), actorOperations: z.array(operationId).min(1).max(256), ttlSeconds: z.number().int().min(1).max(604800).optional(), operationKey: key }).strict(), annotations: write,
+            inputSchema: ScopeSchema.extend({ buildId: id, datasetId: id.optional(), seed: z.string().regex(/^(0|[1-9][0-9]*)$/).max(80), actorOperations: z.array(operationId).min(1).max(256), ttlSeconds: z.number().int().min(1).max(2592000).optional(), operationKey: key }).strict(), annotations: write,
         }, ({ operationKey, ...body }) => safe(() => request("POST", "/v1/service-instances", body, operationKey)));
     if (principal.capabilities.includes("services:invoke"))
         server.registerTool("firedrill_service_invoke", {

@@ -37,8 +37,16 @@ export async function executeTarget(claim, native, outer, attach, tools = {}, st
     outer.addEventListener("abort", onAbort, { once: true });
     if (outer.aborted)
         onAbort();
-    const timer = setTimeout(() => controller.abort(new Error("TARGET_TIMEOUT: execution deadline reached")), limits.timeoutMs);
-    const signal = controller.signal, started = performance.now();
+    const signal = controller.signal, started = performance.now(), deadline = started + limits.timeoutMs;
+    let timer;
+    const scheduleDeadline = () => {
+        const remaining = deadline - performance.now();
+        if (remaining <= 0)
+            controller.abort(new Error("TARGET_TIMEOUT: execution deadline reached"));
+        else
+            timer = setTimeout(scheduleDeadline, Math.min(remaining, 2147483647));
+    };
+    scheduleDeadline();
     // The task sees its input and identity, not evaluator checks, hidden datasets
     // or future sequence steps. Native code gets fresh JSON values so it cannot
     // rewrite the runner's retained claim through an object reference.

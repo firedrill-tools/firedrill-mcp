@@ -5,26 +5,19 @@ inspect retained evidence, compare runs and manage authorized synthetic Tools.
 This is the **operator → Firedrill** connection on the human's behalf. It does
 not sign in to the coding-agent provider or the application being simulated.
 
-This repository is a private release-staging export. Its package and registry
-metadata are prepared, not a claim of public availability or directory approval.
-It contains a standalone stdio client, its TypeScript source and its exact
+This repository contains a standalone stdio client, its TypeScript source and its exact
 client dependencies. It contains no Firedrill engine, service, database or
 HTTP server. Customer applications execute in their own runner; MCP admission
 alone never launches code on a laptop.
 
-## Install the reviewed client
+## Install the client
 
-Use Node 22 or newer. From your application repository, install the exact archive
-provided by the approved release handoff:
+Use Node 22 or newer. From your application repository:
 
 ```sh
-npm install --save-dev --ignore-scripts /absolute/path/to/the-reviewed-mcp.tgz
+npm install --save-dev --save-exact --ignore-scripts @firedrill-run/mcp@2.0.0
 ```
 
-Replace the archive placeholder with the real supplied file. After an exact
-version is publicly released, the corresponding registry install is
-`npm install --save-dev --ignore-scripts @firedrill-run/mcp@VERSION`, with the
-released version substituted. Do not infer a release from this README.
 The CLI package also includes the same `firedrill-mcp` binary: install one owner
 of that binary per application, not both packages.
 
@@ -84,9 +77,8 @@ workspace alias, global installation or automatic lifecycle build is needed.
 reviewed artifact's source/file hashes and original dependency notices. A local
 rebuild is a new artifact, not automatically the reviewed release.
 
-`server.json` is prepared metadata for the official MCP Registry. It is not
-submitted. Publishing requires an available exact npm version, namespace
-authority and the release owner's separate approval.
+`server.json` describes the npm transport and version for the official MCP
+Registry. Directory availability is independent of installing the client directly.
 
 ## License
 

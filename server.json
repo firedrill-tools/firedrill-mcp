@@ -7,12 +7,12 @@
     "url": "https://github.com/firedrill-tools/firedrill-mcp",
     "source": "github"
   },
-  "version": "2.0.0-alpha.9",
+  "version": "2.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@firedrill-run/mcp",
-      "version": "2.0.0-alpha.9",
+      "version": "2.0.0",
       "transport": {
         "type": "stdio"
       },

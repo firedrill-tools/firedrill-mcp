@@ -6,6 +6,8 @@ import { POPULATION_VERSION, PopulationMaterializeSchema, ActivityFiltersSchema,
 import { registerServiceTools } from "./services.js";
 import { registerInterventionTools } from "./interventions.js";
 import { registerRetentionTools } from "./retention.js";
+import { registerCapacityTools } from "./capacity.js";
+import { readCapacityRequestAction } from "../contracts/index.js";
 import { sequenceMetadata } from "./sequence.js";
 import { assertReadOnlyRequest } from "./readonly.js";
 import { inspectionOutput, type InspectionRead } from "./inspection-output.js";
@@ -84,10 +86,12 @@ export async function createOperatorServer(config: OperatorConfig) {
           ...(resourceId(details?.buildId) ? { buildId: details.buildId } : {}), ...(resourceId(details?.operationId) ? { operationId: details.operationId } : {}), ...(failure ? { failure } : {}) });
       }
       const uncertain = !readOnly && (response.status >= 500 || /UNCERTAIN|UNCONFIRMED|RECOVERY_REQUIRED|REFRESH_PENDING/i.test(value.error?.code ?? ""));
+      const capacityRequest = readCapacityRequestAction(value.error?.details);
       throw new FiredrillError(value.error?.code ?? "API_ERROR", value.error?.message ?? "Request failed",
         value.error?.repair ?? "Inspect the retained operation before retrying; do not repeat an uncertain target.",
         { status: response.status, requestId: value.error?.requestId, validation: value.error?.validation,
           uncertain, workStarted: readOnly ? false : "unknown",
+          ...(capacityRequest ? { capacityRequest } : {}),
           retry: readOnly ? "same_request" : uncertain ? "reconcile" : "never" });
     }
     return value;
@@ -189,6 +193,7 @@ export async function createOperatorServer(config: OperatorConfig) {
   registerServiceTools(server, { principal: context.principal, readonly: config.readonly, apiUrl: origin.origin, request, safe });
   registerInterventionTools(server, { principal: context.principal, readonly: config.readonly, request, safe });
   registerRetentionTools(server, { principal: context.principal, readonly: config.readonly, request, safe });
+  registerCapacityTools(server, { principal: context.principal, readonly: config.readonly, request, safe });
   registerRetainedValueTools(server, { principal: context.principal, request, safe });
   registerFollowTool(server, { principal: context.principal, request, safe });
   if (context.principal.capabilities.includes("read")) server.registerTool("firedrill_sequence", {

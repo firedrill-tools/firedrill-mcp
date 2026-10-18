@@ -1,4 +1,4 @@
-import { validationDiagnostics, validationMessage } from "../contracts/index.js";
+import { validationDiagnostics, validationMessage, readCapacityRequestAction } from "../contracts/index.js";
 export const CLIENT_DIAGNOSTICS_VERSION = "2026-10-17-client-diagnostics.1";
 /** Conservative adapter error signal, not a target result or metric. Follow
  * bounded causes/aggregate errors so a native wrapper cannot erase an inner timeout. */
@@ -69,6 +69,13 @@ export class FiredrillError extends Error {
             delete this.details.causeCode;
         if (this.details.phase !== undefined && !["declaration", "upload"].includes(this.details.phase))
             delete this.details.phase;
+        if (this.details.capacityRequest !== undefined) {
+            const action = readCapacityRequestAction(this.details);
+            if (action)
+                this.details.capacityRequest = action;
+            else
+                delete this.details.capacityRequest;
+        }
     }
     toJSON() {
         const uncertain = this.details.uncertain ?? /UNCERTAIN|UNCONFIRMED|RECOVERY_REQUIRED|REFRESH_PENDING/i.test(this.code);

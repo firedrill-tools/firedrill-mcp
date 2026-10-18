@@ -79,8 +79,8 @@ export function validateToolStartPlan(input) {
         if (!Array.isArray(tool.operations) || !tool.operations.length || tool.operations.length > 256 || tool.operations.some((op) => typeof op !== "string" || !op || op.length > 160) || new Set(tool.operations).size !== tool.operations.length)
             invalid("Select distinct declared operation IDs for each Tool.");
         const seed = tool.seed ?? "0", ttlSeconds = tool.ttlSeconds ?? 1800;
-        if (typeof seed !== "string" || !/^(0|[1-9][0-9]*)$/.test(seed) || seed.length > 80 || !Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > 604800)
-            invalid("Seed must be an unsigned decimal string; lifetime must be 1–604800 seconds.");
+        if (typeof seed !== "string" || !/^(0|[1-9][0-9]*)$/.test(seed) || seed.length > 80 || !Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > 2592000)
+            invalid("Seed must be an unsigned decimal string; lifetime must be 1–2592000 seconds.");
         return { alias: tool.alias, source: { ...source }, data: { ...data }, operations: [...tool.operations], seed, ttlSeconds };
     });
     const plan = { schemaVersion: "2026-10-15-tool-start.1", tools };

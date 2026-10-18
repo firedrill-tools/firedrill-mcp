@@ -17,6 +17,8 @@ import { executeSequence } from "./sequences.js";
 import { reconcileIsolatedExecution, type IsolatedBinding } from "./isolated.js";
 import type { BatchPage, BatchSummary, BatchComparison, ScenarioPage, AvailableScenarioEntry, SequenceRecord } from "./inspection.js";
 import { FiredrillCredentials } from "./credentials.js";
+import { FiredrillCapacity } from "./capacity.js";
+import { readCapacityRequestAction } from "../contracts/index.js";
 import { FiredrillRetention } from "./retention.js";
 import { readJsonInput, readPublicConfig } from "./input-files.js";
 import { FiredrillLogin, type LoginCredential } from "./login.js";
@@ -63,6 +65,8 @@ export type { RetainedValueOptions, RunRetainedValueOptions, BatchRetainedValueO
 export { FiredrillLogin } from "./login.js";
 export type { LoginOptions, LoginAction, LoginStatus, LoginCredential, LoginOrganizations, LoginOrganizationChoice } from "./login.js";
 export { FiredrillCredentials, IssuedCredential } from "./credentials.js";
+export { FiredrillCapacity } from "./capacity.js";
+export type { CapacityRequestOptions, CapacityRequest, CapacityRequestPage, CapacityResource } from "./capacity.js";
 export type { IssueCredentialInput, CredentialMetadata, CredentialPage, MachineCapability } from "./credentials.js";
 export { FiredrillRetention, RETENTION_VERSION } from "./retention.js";
 export type * from "./retention.js";
@@ -224,10 +228,11 @@ export class Firedrill {
       if (!response.ok) {
         const validation = readValidationDiagnostics(value.error?.validation);
         const buildDetails = value.error?.code === "FD_SERVICE_BUILD_FAILED" ? readServiceBuildErrorDetails(value.error?.details) : {};
+        const capacityRequest = readCapacityRequestAction(value.error?.details);
         const uncertain = !readOnly && (response.status >= 500 || /UNCERTAIN|UNCONFIRMED|RECOVERY_REQUIRED|REFRESH_PENDING/i.test(value.error?.code ?? ""));
         throw new FiredrillError(value.error?.code ?? "API_ERROR", value.error?.message ?? "Firedrill rejected the operation.", value.error?.repair ?? "Inspect the retained operation before retrying.", { status: response.status, requestId: value.error?.requestId, uncertain,
           workStarted: readOnly ? false : "unknown",
-          retry: readOnly ? "same_request" : uncertain ? "reconcile" : "never", ...(validation ? { validation } : {}), ...buildDetails });
+          retry: readOnly ? "same_request" : uncertain ? "reconcile" : "never", ...(validation ? { validation } : {}), ...buildDetails, ...(capacityRequest ? { capacityRequest } : {}) });
       }
       return value as T;
     } catch (error) {
@@ -321,6 +326,7 @@ export class Firedrill {
   get interventions(): FiredrillInterventions { return new FiredrillInterventions(() => this.scope(), (method, path, body, key) => this.request(method, path, body, key)); }
   get services(): FiredrillServices { return new FiredrillServices(() => this.scope(), (method, path, body, key) => this.request(method, path, body, key), { apiUrl: this.apiUrl, journalDirectory: this.options.journalDirectory, identity: async () => { const context = await this.context(); return { id: context.principal.id, organizationId: context.principal.organizationId }; } }); }
   get credentials(): FiredrillCredentials { return new FiredrillCredentials(() => this.scope(), (method, path, body, key) => this.request(method, path, body, key)); }
+  get capacity(): FiredrillCapacity { return new FiredrillCapacity(() => this.scope(), (method, path, body, key) => this.request(method, path, body, key)); }
   get retention(): FiredrillRetention { return new FiredrillRetention(() => this.scope(), (method, path, body, key) => this.request(method, path, body, key)); }
   listProjects() { return this.request<{ items: Project[] }>("GET", "/v1/projects"); }
   createProject(name: string, idempotencyKey: string = randomUUID()) { return this.request<Project>("POST", "/v1/projects", { name }, idempotencyKey); }

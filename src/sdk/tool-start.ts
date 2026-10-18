@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { closeSync, constants, existsSync, fstatSync, fsyncSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Scope, ServiceCatalogAcquisition } from "../contracts/index.js";
+import type { Scope, ServiceCatalogAcquisition, CapacityRequestAction } from "../contracts/index.js";
 import type { FiredrillServices, ServiceInstance, ServiceBuild, ServicePolicy } from "./services.js";
 import { FiredrillError, type DiagnosticCategory, type RetrySafety, type WorkStarted } from "./errors.js";
 import { JournalStore } from "./journal.js";
@@ -22,7 +22,7 @@ export interface ToolStartItem {
   instanceObservation?: { schemaVersion: "2026-10-16-tool-start-observation.1"; state: "confirmed" | "unconfirmed"; lastConfirmedAt: string | null };
   access?: { semanticApi: string; mcp: string; httpBase?: string; uiAvailable: boolean; authentication: "explicit_scoped_connection_required" };
   error?: { code: string; message: string; repair: string; buildId?: string; failure?: ServiceBuildFailure;
-    schemaVersion?: string; category?: DiagnosticCategory; workStarted?: WorkStarted; uncertain?: boolean; retry?: RetrySafety };
+    schemaVersion?: string; category?: DiagnosticCategory; workStarted?: WorkStarted; uncertain?: boolean; retry?: RetrySafety; capacityRequest?: CapacityRequestAction };
 }
 export interface ToolStartResult extends Scope {
   schemaVersion: "2026-10-15-tool-start.1"; operationKey: string; status: "ready" | "partial";
@@ -89,7 +89,7 @@ export function validateToolStartPlan(input: unknown): NormalPlan {
     else if (!["empty", "starter"].includes(data.kind) || Object.keys(data).length !== 1 || data.kind === "starter" && source.kind !== "catalog") invalid("Choose empty state, catalog starter data, or a saved dataset for its exact build.");
     if (!Array.isArray(tool.operations) || !tool.operations.length || tool.operations.length > 256 || tool.operations.some((op: unknown) => typeof op !== "string" || !op || op.length > 160) || new Set(tool.operations).size !== tool.operations.length) invalid("Select distinct declared operation IDs for each Tool.");
     const seed = tool.seed ?? "0", ttlSeconds = tool.ttlSeconds ?? 1800;
-    if (typeof seed !== "string" || !/^(0|[1-9][0-9]*)$/.test(seed) || seed.length > 80 || !Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > 604800) invalid("Seed must be an unsigned decimal string; lifetime must be 1–604800 seconds.");
+    if (typeof seed !== "string" || !/^(0|[1-9][0-9]*)$/.test(seed) || seed.length > 80 || !Number.isSafeInteger(ttlSeconds) || ttlSeconds < 1 || ttlSeconds > 2592000) invalid("Seed must be an unsigned decimal string; lifetime must be 1–2592000 seconds.");
     return { alias: tool.alias, source: { ...source } as ToolStartSelection["source"], data: { ...data } as ToolStartSelection["data"], operations: [...tool.operations], seed, ttlSeconds };
   });
   const plan = { schemaVersion: "2026-10-15-tool-start.1" as const, tools };
