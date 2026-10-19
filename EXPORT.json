@@ -1,12 +1,12 @@
 {
   "schemaVersion": "2026-10-18-agent-repository-export.1",
   "kind": "mcp",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "artifact": {
-    "filename": "firedrill-run-mcp-2.1.0.tgz",
-    "sha256": "f1afc94d54848d8a304561907006eb155c6438ff9e1c1f41b26f4ae6f7247b77",
-    "bytes": 650830,
-    "manifestSha256": "6aa7ebc56546e37d8b6b457fdd4acaef7c010b44a541c3fad5e7d5829545d89d"
+    "filename": "firedrill-run-mcp-2.1.1.tgz",
+    "sha256": "093851cf6339500d93b0ed2f52b189fbf5e4e3b33e46e64197280d31e0ae1ed3",
+    "bytes": 651007,
+    "manifestSha256": "142248f15adfa42ccbaf41a1688a753d6399bbc1e284652a70186b50511caf43"
   },
   "files": [
     {
@@ -187,7 +187,7 @@
     {
       "path": "dist/mcp/local-login.js",
       "bytes": 13301,
-      "sha256": "3b0bcf6ef5ccb739e4aa296f4d430e8765e616335d18e620be9e6424b453887f"
+      "sha256": "933eed78fc108fe51f963464d000c9ea812d6b37af681e33a98ad7c9a799561a"
     },
     {
       "path": "dist/mcp/main.js",
@@ -217,7 +217,7 @@
     {
       "path": "dist/mcp/server.js",
       "bytes": 51086,
-      "sha256": "c321c006a5cd01b9fe3e46385e7f287a98c4160394ee8c1c5d72af26e90f9e4b"
+      "sha256": "9d299433e640b29723ff16e4e8500af9357a4d36e3b2e32550be804165c4657e"
     },
     {
       "path": "dist/mcp/services.js",
@@ -442,22 +442,22 @@
     {
       "path": "package.json",
       "bytes": 1251,
-      "sha256": "7c4bfe23d09a5ff00b8282fa9b79efcdf550c7ed18e92cda6e007b2cf4a0e075"
+      "sha256": "3b0acaada647a18814639dfa3396e19a5e48950e252a088f6e5699b1baec7a7e"
     },
     {
       "path": "PACKAGING.json",
       "bytes": 138723,
-      "sha256": "6aa7ebc56546e37d8b6b457fdd4acaef7c010b44a541c3fad5e7d5829545d89d"
+      "sha256": "142248f15adfa42ccbaf41a1688a753d6399bbc1e284652a70186b50511caf43"
     },
     {
       "path": "README.md",
-      "bytes": 4497,
-      "sha256": "ea1c53d0c7e74b8c9b980317f1744d552cb5ea9bf481394880d06e951674441f"
+      "bytes": 5088,
+      "sha256": "2ccd137bcc379e2b857a2ff02365def11dbdec9da57a84dd25feeac873d4dbf9"
     },
     {
       "path": "server.json",
       "bytes": 1043,
-      "sha256": "68de0acbf4c4d648ac6945339ad14a4c5aeaf8dc33ed25448a8b39a0ff0b241f"
+      "sha256": "64a8458bb47e00658865772eb58f42f1e651b5636408745636a26565cfe7ad5a"
     },
     {
       "path": "src/contracts/activity-filters.ts",
@@ -622,7 +622,7 @@
     {
       "path": "src/mcp/local-login.ts",
       "bytes": 12577,
-      "sha256": "5b8fc2970954959ab6b5d1aa06b345833d6a7e07fbcaa94e5b685b69462614d2"
+      "sha256": "cdcd30f17962be0bc0778926d15c34481700105def3ca35bc5b137c47df01518"
     },
     {
       "path": "src/mcp/main.ts",
@@ -652,7 +652,7 @@
     {
       "path": "src/mcp/server.ts",
       "bytes": 49972,
-      "sha256": "4a77d96bb110ebabf012304c9156f99035df3386ddd6ca53176a66f24637cdf1"
+      "sha256": "6650eea9292b27872207562ebb0892420255ef87198c2ae9176f80d823312d77"
     },
     {
       "path": "src/mcp/services.ts",
@@ -830,7 +830,7 @@
       "sha256": "0e309246e2c9684f524479af2719cbe3da0810ad2f9342cf457fa2b669b1f39d"
     }
   ],
-  "sourceSnapshotSha256": "d88fbcfd0d1b71bfad57031917919f1ce5df76b3fd4960b89dd5dfb1812c689e",
+  "sourceSnapshotSha256": "84142f8f9123b96141af6ebd5dcaf2ee8f483af867fe056e8361f7a9ab4d38df",
   "boundary": "Client-only source export. No credentials, private runtime, service, database or repository history. Build/packaging construction is not runtime qualification.",
   "published": false,
   "listed": false
