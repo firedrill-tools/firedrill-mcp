@@ -60,13 +60,13 @@ jobs:
           const server=JSON.parse(readFileSync('server.json','utf8'));
           assert.equal(server.name,'io.github.firedrill-tools/firedrill');
           assert.equal(server.repository.url,'https://github.com/firedrill-tools/firedrill-mcp');
-          assert.equal(server.version,'2.1.0');
+          assert.equal(server.version,'2.1.1');
           assert.equal(server.packages.length,1);
           assert.equal(server.packages[0].identifier,'@firedrill-run/mcp');
           assert.equal(server.packages[0].version,server.version);
-          const npm=await read('https://registry.npmjs.org/@firedrill-run%2fmcp/2.1.0');
+          const npm=await read('https://registry.npmjs.org/@firedrill-run%2fmcp/2.1.1');
           assert.equal(npm.mcpName,server.name);
-          assert.equal(npm.dist.integrity,'sha512-3TeKhHlzdH+XKGi0ixeuzb9C3em5MokZQHKQ1nZR5j2T0QqeI2ylqKTY9p71u0HNBcLXHLR0wRIEUMiQ03ik8w==');
+          assert.equal(npm.dist.integrity,'sha512-9qChYwcFw7RVRYT53cc2PynmhgPFctwKoaStAA1sNqfC5C/g30Ahdyw6cQGr9WvwqSjJNxfSIawsjEvAN2aM6A==');
           const registry=await read('https://registry.modelcontextprotocol.io/v0.1/servers?search='+encodeURIComponent(server.name));
           const existing=registry.servers.find(item=>item.server.name===server.name&&item.server.version===server.version);
           if(existing) assert.deepEqual(existing.server,server,'Existing immutable Registry version differs; do not publish again');
