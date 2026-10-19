@@ -3,33 +3,12 @@
   "name": "io.github.firedrill-tools/firedrill",
   "title": "Firedrill",
   "description": "Operate simulations and inspect retained evidence with Firedrill.",
-  "repository": {
-    "url": "https://github.com/firedrill-tools/firedrill-mcp",
-    "source": "github"
-  },
-  "version": "2.1.1",
-  "packages": [
+  "websiteUrl": "https://docs.firedrill.run/guides/coding-agents",
+  "version": "2.2.0",
+  "remotes": [
     {
-      "registryType": "npm",
-      "identifier": "@firedrill-run/mcp",
-      "version": "2.1.1",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "FIREDRILL_TOKEN",
-          "description": "Optional scoped CI credential from the caller's secret store; otherwise use protected operator login.",
-          "isSecret": true,
-          "format": "string"
-        },
-        {
-          "name": "FIREDRILL_MCP_READONLY",
-          "description": "Set true to expose only read tools.",
-          "format": "boolean",
-          "default": "false"
-        }
-      ]
+      "type": "streamable-http",
+      "url": "https://api.firedrill.run/mcp"
     }
   ]
 }
