@@ -15,7 +15,7 @@ alone never launches code on a laptop.
 Use Node 22 or newer. From your application repository:
 
 ```sh
-npm install --save-dev --save-exact --ignore-scripts @firedrill-run/mcp@2.1.0
+npm install --save-dev --ignore-scripts @firedrill-run/mcp
 ```
 
 The CLI package also includes the same `firedrill-mcp` binary: install one owner
@@ -26,6 +26,19 @@ In a host that supports stdio MCP, configure command `npx`, arguments
 Production is automatic; no API-address environment variable is needed.
 If the host cannot set a working directory, use the absolute installed binary
 path instead. Alternate API addresses are rejected. Do not put a credential in the config.
+
+Native registration from the application repository, after the installation above:
+
+```sh
+codex mcp add firedrill -- npx --no-install firedrill-mcp
+# Or, for Claude Code project scope:
+claude mcp add --scope project --transport stdio firedrill -- npx --no-install firedrill-mcp
+```
+
+Codex writes user-wide MCP settings. Claude uses the selected project's `.mcp.json`
+and asks for project server approval. If the CLI is installed globally instead,
+replace `npx --no-install firedrill-mcp` with `firedrill-mcp`; do not install both
+binary owners. Skills/plugin installation is a separate host-native operation.
 
 The client reuses the protected Firedrill login for that exact origin. Otherwise
 `firedrill_authenticate` starts an explicit device approval: show the human its
