@@ -3,12 +3,12 @@
   "name": "io.github.firedrill-tools/firedrill",
   "title": "Firedrill",
   "description": "Operate simulations and inspect retained evidence with Firedrill.",
-  "websiteUrl": "https://docs.firedrill.run/guides/coding-agents",
-  "version": "2.2.0",
+  "websiteUrl": "https://firedrill.run/agents",
+  "version": "2.2.2",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://api.firedrill.run/mcp"
+      "url": "https://mcp.firedrill.run/mcp"
     }
   ]
 }
