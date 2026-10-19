@@ -67,11 +67,11 @@ jobs:
           const server=JSON.parse(readFileSync('server.json','utf8'));
           assert.equal(server.$schema,'https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json');
           assert.equal(server.name,'io.github.firedrill-tools/firedrill');
-          assert.equal(server.version,'2.2.0');
-          assert.equal(server.websiteUrl,'https://docs.firedrill.run/guides/coding-agents');
+          assert.equal(server.version,'2.2.1');
+          assert.equal(server.websiteUrl,'https://firedrill.run/agents');
           assert.equal(Object.hasOwn(server,'packages'),false,'Remote-only metadata must not advertise npm installation');
-          assert.deepEqual(server.remotes,[{type:'streamable-http',url:'https://api.firedrill.run/mcp'}]);
-          const metadataUrl='https://api.firedrill.run/.well-known/oauth-protected-resource/mcp';
+          assert.deepEqual(server.remotes,[{type:'streamable-http',url:'https://mcp.firedrill.run/mcp'}]);
+          const metadataUrl='https://mcp.firedrill.run/.well-known/oauth-protected-resource/mcp';
           const challenge=await response(server.remotes[0].url,401);
           assert.match(challenge.headers.get('www-authenticate')??'',/\bBearer\b/i);
           assert((challenge.headers.get('www-authenticate')??'').includes(`resource_metadata="${metadataUrl}"`),'Remote MCP must advertise its public protected-resource metadata');
