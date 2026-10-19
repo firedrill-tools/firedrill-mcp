@@ -2,6 +2,12 @@ name: Publish MCP Registry metadata
 
 on:
   workflow_dispatch:
+    inputs:
+      oauth_qualified:
+        description: Native host browser OAuth and an authenticated scoped MCP call have passed for this service release
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -12,7 +18,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.oauth_qualified == true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -26,7 +32,7 @@ jobs:
         with:
           node-version: 24
           package-manager-cache: false
-      - name: Check reviewed package and existing Registry record
+      - name: Check remote metadata, OAuth discovery and existing Registry record
         id: preflight
         shell: bash
         run: |
@@ -37,7 +43,7 @@ jobs:
           import {setTimeout as delay} from 'node:timers/promises';
           const transientStatuses=new Set([408,425,429,500,502,503,504]);
           const transientCodes=new Set(['UND_ERR_CONNECT_TIMEOUT','UND_ERR_HEADERS_TIMEOUT','UND_ERR_SOCKET','ECONNRESET','ECONNREFUSED','ENOTFOUND','EAI_AGAIN','ETIMEDOUT','EHOSTUNREACH','ENETUNREACH']);
-          async function read(url) {
+          async function response(url, expectedStatus=200) {
             for(let attempt=1;attempt<=3;attempt++) {
               const started=Date.now(); let status;
               console.log(`Reading ${url} (attempt ${attempt}/3)`);
@@ -45,10 +51,10 @@ jobs:
                 const response=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(20000)});
                 status=response.status;
                 console.log(`GET ${url}: HTTP ${status} after ${Date.now()-started}ms`);
-                if(status!==200) { await response.body?.cancel(); throw new Error('Unexpected HTTP status'); }
-                return await response.json();
+                if(status!==expectedStatus) { await response.body?.cancel(); throw new Error('Unexpected HTTP status'); }
+                return response;
               } catch(error) {
-                const code=status!==undefined&&status!==200?`HTTP_${status}`:error?.cause?.code??error?.name??'READ_FAILED';
+                const code=status!==undefined&&status!==expectedStatus?`HTTP_${status}`:error?.cause?.code??error?.name??'READ_FAILED';
                 const transient=transientStatuses.has(status)||error?.name==='TimeoutError'||transientCodes.has(error?.cause?.code);
                 const retry=attempt<3&&transient;
                 console.error(`GET ${url} failed: ${code} after ${Date.now()-started}ms; ${retry?'bounded retry follows':'no read result accepted'}`);
@@ -57,21 +63,28 @@ jobs:
               }
             }
           }
+          async function read(url) { return (await response(url)).json(); }
           const server=JSON.parse(readFileSync('server.json','utf8'));
+          assert.equal(server.$schema,'https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json');
           assert.equal(server.name,'io.github.firedrill-tools/firedrill');
-          assert.equal(server.repository.url,'https://github.com/firedrill-tools/firedrill-mcp');
-          assert.equal(server.version,'2.1.0');
-          assert.equal(server.packages.length,1);
-          assert.equal(server.packages[0].identifier,'@firedrill-run/mcp');
-          assert.equal(server.packages[0].version,server.version);
-          const npm=await read('https://registry.npmjs.org/@firedrill-run%2fmcp/2.1.0');
-          assert.equal(npm.mcpName,server.name);
-          assert.equal(npm.dist.integrity,'sha512-3TeKhHlzdH+XKGi0ixeuzb9C3em5MokZQHKQ1nZR5j2T0QqeI2ylqKTY9p71u0HNBcLXHLR0wRIEUMiQ03ik8w==');
+          assert.equal(server.version,'2.2.0');
+          assert.equal(server.websiteUrl,'https://docs.firedrill.run/guides/coding-agents');
+          assert.equal(Object.hasOwn(server,'packages'),false,'Remote-only metadata must not advertise npm installation');
+          assert.deepEqual(server.remotes,[{type:'streamable-http',url:'https://api.firedrill.run/mcp'}]);
+          const metadataUrl='https://api.firedrill.run/.well-known/oauth-protected-resource/mcp';
+          const challenge=await response(server.remotes[0].url,401);
+          assert.match(challenge.headers.get('www-authenticate')??'',/\bBearer\b/i);
+          assert((challenge.headers.get('www-authenticate')??'').includes(`resource_metadata="${metadataUrl}"`),'Remote MCP must advertise its public protected-resource metadata');
+          await challenge.body?.cancel();
+          const metadata=await read(metadataUrl);
+          assert.equal(metadata.resource,server.remotes[0].url);
+          assert.deepEqual(metadata.authorization_servers,['https://signin.firedrill.run']);
+          assert.deepEqual(metadata.bearer_methods_supported,['header']);
           const registry=await read('https://registry.modelcontextprotocol.io/v0.1/servers?search='+encodeURIComponent(server.name));
           const existing=registry.servers.find(item=>item.server.name===server.name&&item.server.version===server.version);
           if(existing) assert.deepEqual(existing.server,server,'Existing immutable Registry version differs; do not publish again');
           appendFileSync(process.env.GITHUB_OUTPUT,'publish='+String(!existing)+'\n');
-          console.log(existing?'Exact Registry version already exists.':'Reviewed npm package confirmed; Registry version is absent.');
+          console.log(existing?'Exact Registry version already exists.':'Remote discovery confirmed; Registry version is absent. Native OAuth qualification is a separate required release gate.');
           NODE
       - name: Download and verify official publisher
         if: steps.preflight.outputs.publish == 'true'

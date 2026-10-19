@@ -5,53 +5,47 @@ inspect retained evidence, compare runs and manage authorized synthetic Tools.
 This is the **operator → Firedrill** connection on the human's behalf. It does
 not sign in to the coding-agent provider or the application being simulated.
 
-This repository contains a standalone stdio client, its TypeScript source and its exact
-client dependencies. It contains no Firedrill engine, service, database or
-HTTP server. Customer applications execute in their own runner; MCP admission
-alone never launches code on a laptop.
+## Connect directly
 
-## Install the client
+Use Firedrill's remote Streamable HTTP endpoint:
 
-Use Node 22 or newer. From your application repository:
-
-```sh
-npm install --save-dev --ignore-scripts @firedrill-run/mcp
+```text
+https://api.firedrill.run/mcp
 ```
 
-The CLI package also includes the same `firedrill-mcp` binary: install one owner
-of that binary per application, not both packages.
-
-In a host that supports stdio MCP, configure command `npx`, arguments
-`["--no-install", "firedrill-mcp"]` and the application's working directory.
-Production is automatic; no API-address environment variable is needed.
-If the host cannot set a working directory, use the absolute installed binary
-path instead. Alternate API addresses are rejected. Do not put a credential in the config.
-
-Native registration from the application repository, after the installation above:
+No local MCP package, Firedrill CLI or Node.js installation is required for this
+connection. Configure it through your host's native commands. For Codex:
 
 ```sh
-codex mcp add firedrill -- npx --no-install firedrill-mcp
-# Or, for Claude Code project scope:
-claude mcp add --scope project --transport stdio firedrill -- npx --no-install firedrill-mcp
+codex mcp add firedrill --url https://api.firedrill.run/mcp
+codex mcp login firedrill
 ```
 
-Codex writes user-wide MCP settings. Claude uses the selected project's `.mcp.json`
-and asks for project server approval. If the CLI is installed globally instead,
-replace `npx --no-install firedrill-mcp` with `firedrill-mcp`; do not install both
-binary owners. Skills/plugin installation is a separate host-native operation.
+For Claude Code project scope:
 
-The client reuses the protected Firedrill login for that exact origin. Otherwise
-`firedrill_authenticate` starts an explicit device approval: show the human its
-URL/code, observe `status`, and select an authorized organization with `choose`
-only when needed. Tokens are not returned to the model. External verification,
-invitation or administrator actions must be completed by the human; they cannot
-be bypassed by creating another organization. A later account/organization
-change requires an explicit reconnect, not silently switched authority.
+```sh
+claude mcp add --scope project --transport http firedrill https://api.firedrill.run/mcp
+claude mcp login firedrill
+```
 
-For CI, supply an authorized scoped `FIREDRILL_TOKEN` through the environment
-from your secret store. It takes precedence over saved login; CI never prompts
-or opens a browser. `FIREDRILL_MCP_READONLY=true` removes mutation tools while
-the API still checks current authority on every request.
+Codex writes user-wide MCP settings. Claude uses the selected project's
+`.mcp.json` and asks for project approval. In Cursor, add
+`"firedrill": { "url": "https://api.firedrill.run/mcp" }` under `mcpServers` in
+`.cursor/mcp.json` and use its browser sign-in. In Kimi Code, use `/mcp-config`
+to add a project HTTP server at that URL, then `/mcp-config login firedrill`.
+Preserve other servers. Skills/plugin installation is a separate native action.
+
+The browser authorization uses WorkOS. Review the identity and intended
+organization, and let the host store its OAuth credential privately. Do not paste
+tokens into chat or repository configuration. Account creation, email verification,
+invitations and host trust remain explicit human steps when required; never
+bypass them with another identity or replacement organization.
+
+Remote MCP can prepare work and read retained results; it cannot execute a repo
+on the customer's machine. Actual target execution uses a separately authorized
+customer-owned CLI/SDK runner. CLI sign-in is separate from the MCP host's OAuth
+session. CI supplies its own scoped credential through a secret store and never
+opens browser approval. Do not transfer credentials between these clients.
 
 ## First useful workflow
 
@@ -76,22 +70,16 @@ The companion `firedrill-skills` repository supplies optional task-oriented
 instructions. Installing instructions is not permission to run a simulation,
 upload customer source, change workspace trust or authorize another account.
 
-## Build this source export
+## Repository contents
 
-```sh
-npm install --ignore-scripts
-npm run build
-```
+`server.json` describes the remote Streamable HTTP endpoint for the official MCP
+Registry. Connecting uses that endpoint, not an npm MCP installation. Registry
+metadata does not deploy a server or prove that browser authorization works.
 
-The explicit build compiles `src/mcp/main.ts` and its local client-only closure
-into `dist/`. The binary starts `dist/mcp/main.js`. No private checkout,
-workspace alias, global installation or automatic lifecycle build is needed.
-`package.json` pins runtime and build dependencies; `PACKAGING.json` records the
-reviewed artifact's source/file hashes and original dependency notices. A local
-rebuild is a new artifact, not automatically the reviewed release.
-
-`server.json` describes the npm transport and version for the official MCP
-Registry. Directory availability is independent of installing the client directly.
+Previously distributed client source, exact dependency records and their license
+notices remain in this repository. They contain no Firedrill engine, service,
+database or managed HTTP server. Their presence is not an onboarding step, and
+local environment settings do not configure the managed remote connection.
 
 ## License
 
