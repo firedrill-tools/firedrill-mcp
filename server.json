@@ -4,7 +4,7 @@
   "title": "Firedrill",
   "description": "Operate simulations and inspect retained evidence with Firedrill.",
   "websiteUrl": "https://firedrill.run/agents",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "remotes": [
     {
       "type": "streamable-http",
