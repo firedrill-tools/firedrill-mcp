@@ -44,24 +44,27 @@ tokens into chat or repository configuration. Account creation, email verificati
 invitations and host trust remain explicit human steps when required; never
 bypass them with another identity or replacement organization.
 
-Remote MCP can prepare work and read retained results; it cannot execute a repo
-on the customer's machine. Actual target execution uses a separately authorized
-customer-owned CLI/SDK runner. CLI sign-in is separate from the MCP host's OAuth
-session. CI supplies its own scoped credential through a secret store and never
-opens browser approval. Do not transfer credentials between these clients.
+The MCP server cannot read your files or start processes. A drill against a
+local target, meaning your agent running on your machine, runs through the
+Firedrill CLI (`npm install --global firedrill-run`, then `firedrill init`).
+Hosted cloud worlds run on Firedrill's side. CLI sign-in is separate from the
+MCP host's OAuth session, so use the same organization for both. CI supplies
+its own scoped credential through a secret store and never opens browser
+approval. Do not transfer credentials between these clients.
 
 ## First useful workflow
 
-1. Read `firedrill_discover`, then the advertised `firedrill_schema` definitions.
-2. Read `firedrill_context` and deliberately choose the project/environment.
-3. Inspect the application's real command, HTTP or native invocation seam.
-   Preview a small authored recipe before admitting it. Checks and Tools are
-   optional; evaluation is a separate explicit choice.
-4. If authorized to execute, preserve the creation key and exact arguments.
-   Follow the returned continuation through the CLI or native SDK to attach a
-   customer-owned runner to that same batch. Do not create a second batch.
-5. Read reports/evidence using exact scope and returned cursors. Keep execution,
-   outcome, assessment and CI gate separate; missing evidence is not zero.
+1. Call `firedrill_discover` and `firedrill_projects` to see what the server
+   supports and which workspaces you can use.
+2. Read the repository, pick scenarios with `firedrill_scenarios`, and check a
+   small plan with `firedrill_preview` before anything is saved.
+3. With a person's approval, start the drill with `firedrill_create_batch`,
+   against a local target through the CLI or a hosted cloud world. Actions
+   that use credits need that approval.
+4. Track progress with `firedrill_follow`, then inspect results with
+   `firedrill_summary` and `firedrill_report`.
+5. Synthetic tool sessions start with `firedrill_tools_start`; services are
+   managed with the `firedrill_service_*` tools.
 
 Mutations require saved idempotency keys. After an uncertain reply, reconcile
 the same action/key; never repeat a target merely to recover its evidence.
