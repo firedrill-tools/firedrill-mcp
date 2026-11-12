@@ -48,23 +48,50 @@ The MCP server cannot read your files or start processes. A drill against a
 local target, meaning your agent running on your machine, runs through the
 Firedrill CLI (`npm install --global firedrill-run`, then `firedrill init`).
 Hosted cloud worlds run on Firedrill's side. CLI sign-in is separate from the
-MCP host's OAuth session, so use the same organization for both. CI supplies
-its own scoped credential through a secret store and never opens browser
-approval. Do not transfer credentials between these clients.
+MCP host's OAuth session, so use the same organization for both. Do not transfer
+credentials between these clients. Managed CI execution is not available in
+this release.
+
+## Agent registration
+
+For an agent acting on a person's behalf, follow
+[Firedrill account access](https://app.firedrill.run/auth.md). This uses WorkOS's
+hosted service-auth claim ceremony. The person signs in, selects an organization
+and returns the displayed code. An email address alone never grants access.
+When exchanging the resulting assertion for a token to call MCP, set the
+resource to exactly `https://mcp.firedrill.run`. The default application audience
+is not a substitute. Keep credentials in the client's private credential store.
+
+This registration flow is separate from the MCP host's normal browser OAuth
+connection and the CLI's device sign-in. Never copy credentials between them.
 
 ## First useful workflow
 
-1. Call `firedrill_discover` and `firedrill_projects` to see what the server
-   supports and which workspaces you can use.
-2. Read the repository, pick scenarios with `firedrill_scenarios`, and check a
-   small plan with `firedrill_preview` before anything is saved.
-3. With a person's approval, start the drill with `firedrill_create_batch`,
-   against a local target through the CLI or a hosted cloud world. Actions
-   that use credits need that approval.
-4. Track progress with `firedrill_follow`, then inspect results with
-   `firedrill_summary` and `firedrill_report`.
-5. Synthetic tool sessions start with `firedrill_tools_start`; services are
-   managed with the `firedrill_service_*` tools.
+1. Read the tools advertised by the connected server. Call
+   `firedrill_workspaces` and select the intended workspace explicitly.
+2. Your coding agent reads the local project. Use `firedrill_register_agent`
+   to register its descriptor. Use `firedrill_save_resource` to save personas,
+   scenarios and evaluations, then `firedrill_create_world` to assemble them.
+   Reuse existing cloud resources where appropriate rather than duplicating them.
+3. Call `firedrill_review_world` to inspect preparation requirements and the
+   estimate. Use `firedrill_prepare_world` with the reviewed inputs and the
+   workspace's required authorization. Preserve its original request identity.
+4. Use `firedrill_create_campaign` for the selected scenarios, repetitions and
+   concurrency. The local Firedrill CLI companion runs the actual customer
+   agent. MCP cannot launch a process on the laptop. Worlds and results stay
+   cloud-owned.
+5. Read progress and results with `firedrill_report`. Use `firedrill_discover`
+   to find detailed conversation, score, action, state and evidence operations,
+   read their exact schemas, then call them through `firedrill_operation`.
+6. For standalone tools, use `firedrill_review_tools`, `firedrill_quote_tools`
+   and `firedrill_start_tools` in that order. Inspect an instance with
+   `firedrill_inspect_tool`. Discover the exact reset, checkpoint, preview and
+   stop operations instead of guessing their names.
+
+Use each tool's current input schema. These names describe the focused release
+surface, not permission to skip dependency selection, approvals or cost limits.
+Additional operations are available through discovery, not legacy quickstart
+aliases or a second local MCP server.
 
 Mutations require saved idempotency keys. After an uncertain reply, reconcile
 the same action/key; never repeat a target merely to recover its evidence.
