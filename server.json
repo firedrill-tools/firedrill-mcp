@@ -2,13 +2,13 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.firedrill-tools/firedrill",
   "title": "Firedrill",
-  "description": "Operate simulations and inspect retained evidence with Firedrill.",
+  "description": "Plan, run and inspect AI-agent drills with synthetic users, hosted tools and cloud worlds.",
   "websiteUrl": "https://firedrill.run/agents",
-  "version": "2.2.2",
+  "version": "3.0.0",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://mcp.firedrill.run/mcp"
+      "url": "https://mcp.firedrill.run"
     }
   ]
 }

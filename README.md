@@ -10,27 +10,27 @@ not sign in to the coding-agent provider or the application being simulated.
 Use Firedrill's remote Streamable HTTP endpoint:
 
 ```text
-https://mcp.firedrill.run/mcp
+https://mcp.firedrill.run
 ```
 
 No local MCP package, Firedrill CLI or Node.js installation is required for this
 connection. Configure it through your host's native commands. For Codex:
 
 ```sh
-codex mcp add firedrill --url https://mcp.firedrill.run/mcp
+codex mcp add firedrill --url https://mcp.firedrill.run
 codex mcp login firedrill
 ```
 
 For Claude Code project scope:
 
 ```sh
-claude mcp add --scope project --transport http firedrill https://mcp.firedrill.run/mcp
+claude mcp add --scope project --transport http firedrill https://mcp.firedrill.run
 claude mcp login firedrill
 ```
 
 Codex writes user-wide MCP settings. Claude uses the selected project's
 `.mcp.json` and asks for project approval. In Cursor, add
-`"firedrill": { "url": "https://mcp.firedrill.run/mcp" }` under `mcpServers` in
+`"firedrill": { "url": "https://mcp.firedrill.run" }` under `mcpServers` in
 `.cursor/mcp.json` and use its browser sign-in. In Kimi Code, use `/mcp-config`
 to add a project HTTP server at that URL, then `/mcp-config login firedrill`.
 Preserve other servers. Skills/plugin installation is a separate native action.
