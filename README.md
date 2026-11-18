@@ -7,6 +7,10 @@ not sign in to the coding-agent provider or the application being simulated.
 
 ## Connect directly
 
+If this is your first time using Firedrill, [sign in to the web app](https://app.firedrill.run/signin)
+and create your first workspace there. You don't need a payment card. Then
+connect MCP and use that workspace. If you already have one, reuse it.
+
 Use Firedrill's remote Streamable HTTP endpoint:
 
 ```text
@@ -28,6 +32,9 @@ claude mcp add --scope project --transport http firedrill https://mcp.firedrill.
 claude mcp login firedrill
 ```
 
+If your Claude Code version doesn't have `mcp login`, open Claude Code and use
+`/mcp` to sign in to Firedrill.
+
 Codex writes user-wide MCP settings. Claude uses the selected project's
 `.mcp.json` and asks for project approval. In Cursor, add
 `"firedrill": { "url": "https://mcp.firedrill.run" }` under `mcpServers` in
@@ -47,10 +54,11 @@ bypass them with another identity or replacement organization.
 The MCP server cannot read your files or start processes. A drill against a
 local target, meaning your agent running on your machine, runs through the
 Firedrill CLI (`npm install --global firedrill-run`, then `firedrill init`).
-Hosted cloud worlds run on Firedrill's side. CLI sign-in is separate from the
-MCP host's OAuth session, so use the same organization for both. Do not transfer
-credentials between these clients. Managed CI execution is not available in
-this release.
+Firedrill stores worlds and reports in the cloud and hosts synthetic tools.
+CLI sign-in is separate from the MCP host's OAuth session. Select the same
+workspace when you use both, and run `firedrill status` to check the CLI.
+Do not transfer credentials between these clients. Managed CI execution is not
+available in this release.
 
 ## Agent registration
 
